@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import csv
+import io
+import re
+import unicodedata
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -132,6 +136,76 @@ def audit(user_id: int, action: str, details: dict[str, Any] | None = None) -> N
         cursor.execute("INSERT INTO audit_log (user_id, action, details) VALUES (%s, %s, %s::jsonb)", (user_id, action, json.dumps(details or {})))
 
 
+def normalized_header(value: Any) -> str:
+    text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+
+
+def pick(row: dict[str, Any], *names: str) -> str:
+    for name in names:
+        value = row.get(name)
+        if value not in (None, ""):
+            return str(value).strip()
+    return ""
+
+
+def closing_rule_id(value: str) -> str:
+    text = normalized_header(value)
+    if "segunda" in text: return "closing-monday"
+    if "quarta" in text: return "closing-wednesday"
+    if "sexta" in text: return "closing-friday"
+    if "quinz" in text or ("15" in text and ("30" in text or "ultimo" in text)): return "closing-fortnight"
+    if "25" in text: return "closing-day-25"
+    if "20" in text: return "closing-day-20"
+    if "30" in text or "31" in text or "mensal" in text: return "closing-month-end"
+    if "diar" in text: return "closing-daily-check" if "verific" in text or "pedido" in text else "closing-daily"
+    return "closing-month-end"
+
+
+def due_rule_id(value: str) -> str:
+    text = normalized_header(value)
+    if "quarta" in text: return "due-same-wednesday"
+    if "10" in text and "20" in text and "30" in text: return "due-sesi"
+    if "tabela" in text or "sodexo" in text: return "due-table"
+    if "28" in text: return "due-28"
+    if "15" in text: return "due-15"
+    return "due-30"
+
+
+def color_rule_id(value: str) -> str:
+    text = normalized_header(value)
+    if "vermel" in text: return "color-red"
+    if "amarel" in text: return "color-yellow"
+    return "color-green"
+
+
+def map_client_row(row: dict[str, Any]) -> dict[str, Any] | None:
+    name = pick(row, "cliente", "nome", "nome_razao_social", "razao_social", "empresa_cliente")
+    if not name:
+        return None
+    closing = pick(row, "fechamento", "data_de_emissao_nota_fechamento", "data_emissao", "faturamento", "periodicidade")
+    due = pick(row, "vencimento", "data_de_vencimento", "regra_de_vencimento", "prazo")
+    company_value = pick(row, "empresa", "empresa_do_grupo", "contexto")
+    company = "Excelência do Pão" if "excel" in normalized_header(company_value) else "Indústria de Pães Nova Esperança"
+    color = pick(row, "cor", "regra_de_cor", "status", "politica")
+    return {
+        "name": name,
+        "document": pick(row, "cnpj_cpf", "cnpj", "cpf", "documento"),
+        "email": pick(row, "email", "e_mail"),
+        "whatsapp": pick(row, "whatsapp", "whatssap", "telefone", "celular"),
+        "company": company,
+        "closing": closing,
+        "closing_rule_id": closing_rule_id(closing),
+        "due_rule": due,
+        "due_rule_id": due_rule_id(due),
+        "color_rule_id": color_rule_id(color),
+        "payment": pick(row, "forma_de_pagamento", "pagamento") or "Boleto",
+        "notes": pick(row, "observacoes", "observacao", "obs"),
+        "requires_order_check": "pedido" in normalized_header(closing) or "verific" in normalized_header(closing),
+        "associated_units": pick(row, "empresas_associadas", "unidades", "filiais"),
+    }
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     with connection() as conn, conn.cursor() as cursor:
@@ -226,6 +300,42 @@ async def upload_file(file: UploadFile = File(...), user: dict[str, Any] = Depen
     return {"id": str(file_id), "name": file.filename, "size": len(content)}
 
 
+@app.post("/api/import/clients")
+async def import_clients(file: UploadFile = File(...), user: dict[str, Any] = Depends(current_user)):
+    content = await file.read(MAX_UPLOAD + 1)
+    if len(content) > MAX_UPLOAD:
+        raise HTTPException(413, "Planilha maior que 5 MB")
+    suffix = Path(file.filename or "").suffix.lower()
+    raw_rows: list[dict[str, Any]] = []
+    if suffix == ".csv":
+        decoded = content.decode("utf-8-sig", errors="replace")
+        try:
+            dialect = csv.Sniffer().sniff(decoded[:4096], delimiters=";,\t,")
+        except csv.Error:
+            dialect = csv.excel_semicolon
+        reader = csv.DictReader(io.StringIO(decoded), dialect=dialect)
+        raw_rows = [{normalized_header(key): value for key, value in row.items()} for row in reader]
+    elif suffix in {".xlsx", ".xlsm"}:
+        from openpyxl import load_workbook
+        workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        for sheet in workbook.worksheets:
+            values = sheet.iter_rows(values_only=True)
+            headers: list[str] | None = None
+            for values_row in values:
+                if headers is None:
+                    candidate = [normalized_header(value) for value in values_row]
+                    if any(value in {"cliente", "nome", "razao_social", "nome_razao_social"} for value in candidate):
+                        headers = candidate
+                    continue
+                row = {headers[index]: value for index, value in enumerate(values_row) if index < len(headers) and headers[index]}
+                raw_rows.append(row)
+    else:
+        raise HTTPException(422, "Use uma planilha XLSX ou CSV")
+    rows = [mapped for row in raw_rows if (mapped := map_client_row(row))]
+    audit(user["id"], "client_spreadsheet_preview", {"file": file.filename, "rows": len(rows)})
+    return {"rows": rows, "count": len(rows)}
+
+
 @app.get("/api/files/{file_id}")
 def get_file(file_id: str, user: dict[str, Any] = Depends(current_user)):
     with connection() as conn, conn.cursor() as cursor:
@@ -234,4 +344,3 @@ def get_file(file_id: str, user: dict[str, Any] = Depends(current_user)):
     if not row or not Path(row[2]).is_file():
         raise HTTPException(404, "Arquivo não encontrado")
     return FileResponse(row[2], media_type=row[1], filename=row[0])
-
