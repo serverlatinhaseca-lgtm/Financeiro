@@ -135,10 +135,53 @@ info "Validando a configuração"
 docker compose config >/dev/null
 ok "Configuração válida"
 
-info "Construindo e iniciando banco, API, frontend e Nginx"
-if ! docker compose up -d --build --remove-orphans; then
+info "Construindo backend e frontend"
+if ! docker compose build backend frontend; then
+  info "Limpando somente o cache de construção corrompido e tentando novamente"
+  docker builder prune -f >/dev/null 2>&1 || true
+  if ! docker compose build --no-cache backend frontend; then
+    docker compose logs --tail=120 || true
+    fail "A construção falhou mesmo após a recuperação do cache Docker."
+  fi
+fi
+
+info "Iniciando e validando o PostgreSQL"
+docker compose up -d database
+database_ready=false
+for _ in $(seq 1 45); do
+  database_id="$(docker compose ps -q database)"
+  if [[ -n "$database_id" ]]; then
+    database_health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$database_id" 2>/dev/null || true)"
+    if [[ "$database_health" == "healthy" ]]; then
+      database_ready=true
+      break
+    fi
+  fi
+  sleep 2
+done
+[[ "$database_ready" == true ]] || fail "O PostgreSQL não ficou saudável dentro do tempo esperado."
+
+# Um volume PostgreSQL preserva a senha definida na primeira inicialização. Esta
+# sincronização permite substituir/recriar o .env sem apagar dados existentes.
+db_user="$(sed -n 's/^POSTGRES_USER=//p' .env | tail -n 1)"
+db_name="$(sed -n 's/^POSTGRES_DB=//p' .env | tail -n 1)"
+db_password="$(sed -n 's/^POSTGRES_PASSWORD=//p' .env | tail -n 1)"
+db_user="${db_user:-gestao}"
+db_name="${db_name:-gestao}"
+[[ "$db_user" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || fail "POSTGRES_USER possui caracteres inválidos."
+[[ "$db_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || fail "POSTGRES_DB possui caracteres inválidos."
+[[ "$db_password" != *$'\n'* && "$db_password" != *$'\r'* ]] || fail "POSTGRES_PASSWORD não pode conter quebra de linha."
+escaped_db_password="${db_password//\'/\'\'}"
+if ! docker compose exec -T database psql -v ON_ERROR_STOP=1 -U "$db_user" -d "$db_name" \
+  -c "ALTER ROLE \"$db_user\" WITH PASSWORD '$escaped_db_password';" >/dev/null; then
+  fail "Não foi possível sincronizar a senha com o volume PostgreSQL existente."
+fi
+ok "Credencial do banco sincronizada sem apagar dados"
+
+info "Iniciando API, frontend e Nginx"
+if ! docker compose up -d --remove-orphans backend frontend nginx; then
   docker compose logs --tail=120 || true
-  fail "A construção falhou. As últimas linhas dos serviços foram exibidas acima."
+  fail "Os serviços não iniciaram. As últimas linhas foram exibidas acima."
 fi
 
 info "Aguardando os serviços ficarem saudáveis"
@@ -169,6 +212,8 @@ fi
 
 server_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
 [[ -n "$server_ip" ]] || server_ip="IP_DO_SERVIDOR"
+ADMIN_EMAIL_VALUE="$(sed -n 's/^ADMIN_EMAIL=//p' .env | tail -n 1)"
+ADMIN_EMAIL_VALUE="${ADMIN_EMAIL_VALUE:-admin@gestao.local}"
 
 printf '\n\033[1;32mInstalação concluída com sucesso.\033[0m\n'
 printf 'Endereço: http://%s\n' "$server_ip"

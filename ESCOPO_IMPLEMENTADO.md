@@ -1,31 +1,78 @@
-# Matriz de cobertura do escopo
+# Matriz de cobertura integral
 
-Este arquivo registra como os materiais fornecidos foram incorporados ao sistema.
+Este documento registra a cobertura funcional da reconstrução. A análise considera as solicitações do usuário nas três conversas compartilhadas do DeepSeek, na conversa compartilhada do ChatGPT, nos anexos operacionais e na referência visual do calendário.
 
-| Origem / necessidade | Implementação entregue |
-|---|---|
-| Escopo geral | Aplicação integrada com dashboard, clientes, financeiro, cobranças, tarefas, rotas, documentos, recados, relatórios e configurações. |
-| Cadastro de clientes | Base única, pesquisa, filtros, inclusão, edição, inativação, perfil, métricas, tags, responsáveis e regras financeiras. |
-| Contas a emitir | Agenda de emissões, cadastro manual, múltiplas NFs, vencimento editável, observações, status “Sem pedido” e geração automática de cobranças. |
-| Conversa DeepSeek — agenda financeira | Visões “Hoje”, “Atrasadas”, “Próximas” e “Todas”; geração automática do mês atual e seguinte; destaque de atraso e responsável pela emissão. |
-| Conversa DeepSeek — fechamentos | Regras editáveis por seletores para diário, dias da semana, quarta de congelados, quinzenal, dias fixos e fechamento mensal emitido no primeiro dia do mês seguinte. |
-| Conversa DeepSeek — vencimentos | Construtor visual para dias corridos, dia da semana, próximo dia de pagamento, regra quinzenal e tabela/calendário mensal; cálculo automático por cliente. |
-| Conversa DeepSeek — regras de cor | Verde aceita várias pendências e não cancela entregas; amarelo aceita no máximo duas; vermelho aceita nenhuma, cobra no dia seguinte e encaminha cancelamento se não houver pagamento. A política é escolhida por cliente e não calculada como score. |
-| Conversa DeepSeek — pedido diário | Clientes como SESI podem exigir verificação no sistema externo, com ações “Tem pedido” e “Sem pedido”; “Sem pedido” encerra a emissão sem criar cobrança. |
-| Conversa DeepSeek — grupos | Grupos com pagador central e unidades associadas; SR. Mignon cadastrado com as 20 unidades informadas. |
-| Importação financeira | Upload XLSX/CSV com reconhecimento de cliente, documento, empresa, fechamento, vencimento, cor, pagamento e observações. |
-| Cobranças | Prioridades por cor, tentativas, histórico, contato, reagendamento, pagamento com comprovante obrigatório, cancelamento, baixa e ações em massa. |
-| Checklist diário | Natureza obrigatória (Emissão, Verificação, Execução ou Lembrete), dias configuráveis, subitens, observações e duplicação. |
-| Quinta-feira | Notas Johnson, SESI e demais clientes; produção; romaneios; etiquetas; folhas e relatórios de 17h e 20h30. |
-| Sábado e domingo | Emissões de domingo/segunda, produções, romaneios, relatórios de líderes, etiquetas, folhas, merendas e conferências importantes. |
-| Planilhas de rotas | 685 registros convertidos para dados estruturados, separados em dias úteis, sábado e domingo, com entregador, viagem, horário, cliente, quantidades, regra e conferência. |
-| Comprovante de Entrega | Gerador A4 com empresa, cliente, NF, data, valor, carimbo e assinatura. |
-| Declaração de Dados Bancários | Gerador A4 com dados configuráveis da empresa e assinatura. |
-| Cotações | Gerador A4 com itens, quantidades, unidade, preço, total, empresa e histórico. |
-| Empresas e identidade | Nova Esperança e Excelência do Pão com logos, cores, dados cadastrais, carimbo e assinaturas extraídos dos modelos. |
-| Usuários e segurança | Login JWT, senha com hash bcrypt, perfis, permissões, auditoria e API protegida. |
-| Infraestrutura | Frontend, FastAPI, PostgreSQL, Nginx na porta 80, volumes persistentes, backup/restauração e Docker Compose. |
+## Arquitetura modular e administração
 
-## Observação de implantação
+| Necessidade                         | Implementação                                                                                                                                                                                                 |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Módulos completos, não simples abas | Dez áreas de primeiro nível: Visão geral, Clientes, Financeiro, Cobranças, Tarefas, Base de rotas, Documentos, Recados, Relatórios e Administração. Cada área operacional possui abas e fluxos próprios.      |
+| Perfis vinculados aos módulos       | Matriz por perfil e módulo com ações `visualizar`, `criar`, `editar`, `excluir`, `aprovar`, `exportar` e `configurar`. O menu é filtrado conforme o perfil autenticado.                                       |
+| CRUD de usuários e perfis           | Administrador cria, edita, ativa/desativa e exclui usuários e perfis; define perfil e acesso às empresas. API administrativa protegida persiste as contas e senhas bcrypt.                                    |
+| Personalização integral             | Nome, título lateral, chamada de login, logo, fundo, miniatura, paleta, superfície, texto, raio e densidade; identidade e dados das empresas; campos e listas; nomes, descrição, ativação e abas dos módulos. |
+| Segurança e continuidade            | JWT, hash bcrypt, trilha de auditoria, backup/restauração JSON, PostgreSQL e anexos persistentes.                                                                                                             |
 
-O modo de desenvolvimento funciona localmente no navegador. Para persistência centralizada e uso multiusuário, utilize o ambiente Docker descrito no `README.md`.
+## Clientes e Financeiro
+
+| Solicitação                    | Implementação                                                                                                                                                                                                                      |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cadastro único                 | Nome, CNPJ/CPF, e-mail, WhatsApp, empresa, grupo, emissor, cobradores, pagamento, envio, faturamento, tags, observações e estado ativo.                                                                                            |
+| Fechamentos configuráveis      | Diário; diário com confirmação de pedido; segunda; quarta de congelados; sexta; quinzenal; dias 20 e 25; dias fixos arbitrários; fim do mês com emissão no primeiro dia seguinte. Regras podem ser criadas e editadas visualmente. |
+| Vencimentos configuráveis      | 15, 28 e 30 dias; quarta da mesma semana; 15 dias seguido do próximo dia 10/20/30; janelas quinzenais; tabela/calendário manual.                                                                                                   |
+| Políticas exatas por cor       | Verde permite várias pendências e nunca cancela fornecimento; amarelo limita a duas pendências; vermelho não aceita vencida, cobra no dia seguinte e encaminha cancelamento. A escolha é cadastral, não score automático.          |
+| Grupo centralizado             | Cadastro de grupos e pagador central, incluindo SR. Mignon e suas 20 unidades.                                                                                                                                                     |
+| SESI e demanda variável        | Ação `Tem pedido`/`Sem pedido`; sem pedido encerra a ocorrência e não cria cobrança.                                                                                                                                               |
+| Contas a emitir                | Visão de hoje, atrasadas, próximas e histórico, múltiplas NFs, adiantamento, vencimento editável, responsável e observações.                                                                                                       |
+| Planner financeiro             | Mini mês, busca, filtros por categoria, navegação, hoje, 1 dia/3 dias/semana, grade horária, emissões e vencimentos coloridos.                                                                                                     |
+| Importação                     | XLSX/CSV para clientes e regras financeiras, com reconhecimento dos principais cabeçalhos.                                                                                                                                         |
+| Ligação Financeiro → Cobranças | Emissão concluída cria a cobrança correspondente; `Sem pedido` não gera cobrança.                                                                                                                                                  |
+
+## Cobranças
+
+| Solicitação          | Implementação                                                                                                   |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Agenda própria       | Planner equivalente ao Financeiro com vencimentos, início da cobrança e retornos reagendados.                   |
+| Momento da ação      | Lembrete no vencimento, se habilitado no cliente, e cobrança a partir do dia seguinte conforme a política.      |
+| Fila e prioridade    | Organização por política Verde/Amarelo/Vermelho, data disponível, valor, responsável e tentativas.              |
+| Histórico detalhado  | Mensagem, resposta, promessa, horário, usuário, canal, resumo, tentativas e próximo contato.                    |
+| Estados operacionais | Pendente, Em andamento, Paga, Reagendada, Cancelamento pendente, Cancelado, Baixada e Arquivada.                |
+| Pagamento e baixa    | Natanael registra o pagamento e o comprovante; o item continua aberto até a baixa final por Marcelo/Jessica.    |
+| Cancelamento         | Data e motivo ficam registrados; Willians visualiza a lista; cancelado pode retornar à fila para nova cobrança. |
+| Negociação           | Reagendamento e pendência de decisão ficam visíveis à diretoria sem cancelamento automático imediato.           |
+| Ações em massa       | Seleção múltipla e ações por tags para lembretes e fila.                                                        |
+
+## Tarefas e checklist de Willians
+
+| Solicitação              | Implementação                                                                                                                                                                                           |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Estrutura flexível       | Tarefa recorrente ou pontual, dias configuráveis, horário, natureza obrigatória, prioridade, responsável, observações, subitens, duplicação, edição e exclusão.                                         |
+| Naturezas                | Emissão, Verificação, Execução e Lembrete visíveis nas listagens.                                                                                                                                       |
+| Quinta-feira             | Johnson e extras; SESIs para verificar; Toder, Plastic, Alojamento, César, Gerdau, Brazul, Iramec, Santa Casa, Embraer/Gláucia/Marinela e Etec; produções, romaneios, etiquetas e relatórios 17h/20h30. |
+| Sábado/domingo           | Oxiteno, Jarinu, Santa Casa, Vivalle, Johnson, SESIs; produção para domingo/segunda; romaneios; líderes 14h/21h; etiquetas, folhas e relatórios de merendas.                                            |
+| Conferências importantes | Planilhas de entrega, pedidos alterados, Hospital São José, Vivalle, Pró Infância, Santa Casa, Santos Dumont, Francisca Júlia e quadro de OK.                                                           |
+| Planner e indicadores    | Meu dia, calendário, catálogo completo, recorrências e indicadores de conclusão.                                                                                                                        |
+
+## Base de rotas
+
+| Solicitação                       | Implementação                                                                                                                 |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Complemento ao sistema de pedidos | Base oficial de organização; não substitui a digitação de pedidos no sistema externo.                                         |
+| Dados importados                  | 685 registros estruturados com dia, entregador, viagem, horário, cliente, quantidades, regra e conferência.                   |
+| Fluxo mensal                      | O que cadastrar hoje, bases mensais, regras fixas/programadas/sob demanda, revisão do mês seguinte e histórico de alterações. |
+| Conferência                       | Estados cadastrado, conferido, divergente e corrigido; edição e exclusão; bloqueio de liberação enquanto houver divergência.  |
+| Métricas                          | Erros, causas, retrabalho, tempo de preparação e entrada. Estrutura pronta para futura integração por API.                    |
+
+## Documentos, recados e relatórios
+
+| Solicitação             | Implementação                                                                                                                 |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Geradores               | Cotação, Comprovante de Entrega e Declaração Bancária em formato A4, com histórico e reimpressão.                             |
+| Modelos personalizáveis | Nome, título, abertura, observações, ativação, empresa, logo, cores, assinatura, carimbo, banco, agência, conta e favorecido. |
+| Recados                 | Prioridade, destinatários, vínculo ao cliente, andamento e conversão em tarefa.                                               |
+| Relatórios              | Painéis visuais de financeiro, cobranças, tarefas e rotas, sem depender de relatório manual.                                  |
+
+## Implantação
+
+O pacote inclui frontend, FastAPI, PostgreSQL, Nginx, Docker Compose, volumes, health checks e `install.sh`. O instalador cria o `.env`, restaura permissões, cria a configuração local, protege credenciais do contexto Docker, tenta reparar cache `invalid tar header`, sincroniza a senha com volume PostgreSQL existente, inicia os serviços e testa a API.
+
+Para os requisitos item a item e critérios de aceite, consulte `REQUISITOS_CONVERSAS.md`.

@@ -1,13 +1,17 @@
 # Gestão Operacional
 
-Sistema web integrado para substituir planilhas e controles manuais de clientes, contas a emitir, cobranças, tarefas diárias, bases de rotas e documentos corporativos.
+Sistema web integrado e personalizável para centralizar clientes, financeiro, cobranças, tarefas, bases de rotas, documentos e gestão de acesso. Os módulos são áreas completas, com painéis, calendários, abas operacionais, histórico, regras e relatórios — não são apenas itens isolados do menu.
 
 ## O que está incluído
 
 - Dashboard operacional com indicadores e prioridades do dia.
+- Administração completa de usuários e perfis, com criação, edição, ativação, exclusão e matriz de permissões por módulo e ação.
+- Módulos ativáveis, renomeáveis e associados aos perfis pelo administrador.
+- Personalização de nome do sistema, títulos, logos, fundo de login, miniatura, cores, densidade, arredondamento, empresas, assinaturas, carimbos e dados bancários.
 - Cadastro unificado de clientes, perfil, score, métricas, tags e regras financeiras.
 - Contas a emitir com emissão manual, adiantamento registrado, múltiplas NFs e vencimento editável.
 - Agenda financeira automática com todas as ocorrências do mês atual e seguinte, sem criar abas ou datas manualmente.
+- Planner visual em formato diário, três dias ou semana, com mini calendário, filtros, busca, horários e eventos coloridos.
 - Filtros imediatos para notas de hoje, atrasadas, próximas e histórico completo.
 - Verificação de pedido para clientes de demanda variável, com “Tem pedido” e “Sem pedido”.
 - Construtores visuais e editáveis de fechamento, vencimento e políticas de cobrança.
@@ -15,15 +19,16 @@ Sistema web integrado para substituir planilhas e controles manuais de clientes,
 - Grupos de faturamento centralizado, incluindo SR. Mignon e suas 20 unidades.
 - Importação de clientes e regras por planilhas XLSX ou CSV.
 - Criação automática de cobrança ao concluir uma emissão.
-- Cobranças com lembrete, tentativas, histórico, pagamento, reagendamento, cancelamento, seleção em massa e baixa.
+- Cobranças com planner próprio, lembrete configurável, tentativas, histórico, promessa de pagamento, comprovante, reagendamento, cancelamento, seleção em massa e baixa final por diretoria.
 - Checklist diário com natureza obrigatória: Emissão, Verificação, Execução ou Lembrete.
 - Tarefas recorrentes de quinta-feira, sábado e domingo descritas no escopo.
-- Base de rotas com 685 registros importados das planilhas anexadas, filtros por dia e entregador, status Cadastrado/Conferido e bloqueio de publicação.
+- Base de rotas com 685 registros importados, visão do que cadastrar hoje, bases mensais, regras, divergências, edição, exclusão, conferência e indicadores de retrabalho.
 - Geradores A4 de Cotação, Comprovante de Entrega e Declaração de Dados Bancários.
 - Identidade visual e assinaturas das duas empresas conforme os modelos fornecidos.
 - Recados internos com opção de gerar tarefa.
 - Relatórios visuais de cobrança, inadimplência e performance.
-- Configurações de empresas, usuários, perfis, permissões, vencimentos, cores, campos personalizados e feriados.
+- Modelos documentais editáveis, com textos, disponibilidade, identidade, assinatura, carimbo e conta bancária definidos por empresa.
+- Configurações de empresas, usuários, perfis, permissões, módulos, abas, vencimentos, cores, campos personalizados e feriados.
 - Backup e restauração em JSON e trilha de auditoria.
 - API com autenticação JWT, PostgreSQL e upload protegido de arquivos de até 5 MB.
 
@@ -41,6 +46,8 @@ O instalador:
 - cria o `.env` com senhas aleatórias quando ele ainda não existe;
 - valida Docker, Compose e as variáveis obrigatórias;
 - constrói backend e frontend com todas as dependências necessárias;
+- recupera automaticamente cache de construção corrompido quando o Docker retorna `invalid tar header`;
+- sincroniza a senha do `.env` com um volume PostgreSQL já existente sem apagar dados;
 - inicia PostgreSQL, API, frontend e Nginx;
 - aguarda os serviços ficarem saudáveis;
 - testa a API e mostra o IP, usuário e senha inicial.
@@ -51,7 +58,7 @@ Se esta for uma primeira instalação e já existir um `.env` que deve ser desca
 ./install.sh --regenerate-env
 ```
 
-O arquivo anterior será preservado como backup. Não use essa opção em uma instalação que já possua dados sem antes conferir as credenciais do banco.
+O arquivo anterior será preservado como backup. O instalador sincroniza a nova senha com o banco existente; ainda assim, mantenha backups antes de qualquer mudança de credenciais em produção.
 
 Acesse `http://IP_DO_SERVIDOR` sem informar porta.
 
@@ -107,3 +114,4 @@ O frontend mantém um modo local no navegador quando a API não está disponíve
 - `nginx/`: proxy reverso para acesso pela porta 80.
 - `docker-compose.yml`: frontend, backend, PostgreSQL e Nginx.
 - `public/brand/`: logos, carimbo e assinaturas fornecidos nos modelos.
+- `REQUISITOS_CONVERSAS.md`: matriz detalhada das solicitações extraídas das quatro conversas e sua implementação.
