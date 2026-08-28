@@ -7,6 +7,13 @@ Sistema web integrado para substituir planilhas e controles manuais de clientes,
 - Dashboard operacional com indicadores e prioridades do dia.
 - Cadastro unificado de clientes, perfil, score, métricas, tags e regras financeiras.
 - Contas a emitir com emissão manual, adiantamento registrado, múltiplas NFs e vencimento editável.
+- Agenda financeira automática com todas as ocorrências do mês atual e seguinte, sem criar abas ou datas manualmente.
+- Filtros imediatos para notas de hoje, atrasadas, próximas e histórico completo.
+- Verificação de pedido para clientes de demanda variável, com “Tem pedido” e “Sem pedido”.
+- Construtores visuais e editáveis de fechamento, vencimento e políticas de cobrança.
+- Políticas corretas por cliente: verde sem limite/cancelamento, amarelo até duas pendências e vermelho sem pendência vencida.
+- Grupos de faturamento centralizado, incluindo SR. Mignon e suas 20 unidades.
+- Importação de clientes e regras por planilhas XLSX ou CSV.
 - Criação automática de cobrança ao concluir uma emissão.
 - Cobranças com lembrete, tentativas, histórico, pagamento, reagendamento, cancelamento, seleção em massa e baixa.
 - Checklist diário com natureza obrigatória: Emissão, Verificação, Execução ou Lembrete.

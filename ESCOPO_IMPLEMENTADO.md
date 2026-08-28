@@ -7,6 +7,13 @@ Este arquivo registra como os materiais fornecidos foram incorporados ao sistema
 | Escopo geral | Aplicação integrada com dashboard, clientes, financeiro, cobranças, tarefas, rotas, documentos, recados, relatórios e configurações. |
 | Cadastro de clientes | Base única, pesquisa, filtros, inclusão, edição, inativação, perfil, métricas, tags, responsáveis e regras financeiras. |
 | Contas a emitir | Agenda de emissões, cadastro manual, múltiplas NFs, vencimento editável, observações, status “Sem pedido” e geração automática de cobranças. |
+| Conversa DeepSeek — agenda financeira | Visões “Hoje”, “Atrasadas”, “Próximas” e “Todas”; geração automática do mês atual e seguinte; destaque de atraso e responsável pela emissão. |
+| Conversa DeepSeek — fechamentos | Regras editáveis por seletores para diário, dias da semana, quarta de congelados, quinzenal, dias fixos e fechamento mensal emitido no primeiro dia do mês seguinte. |
+| Conversa DeepSeek — vencimentos | Construtor visual para dias corridos, dia da semana, próximo dia de pagamento, regra quinzenal e tabela/calendário mensal; cálculo automático por cliente. |
+| Conversa DeepSeek — regras de cor | Verde aceita várias pendências e não cancela entregas; amarelo aceita no máximo duas; vermelho aceita nenhuma, cobra no dia seguinte e encaminha cancelamento se não houver pagamento. A política é escolhida por cliente e não calculada como score. |
+| Conversa DeepSeek — pedido diário | Clientes como SESI podem exigir verificação no sistema externo, com ações “Tem pedido” e “Sem pedido”; “Sem pedido” encerra a emissão sem criar cobrança. |
+| Conversa DeepSeek — grupos | Grupos com pagador central e unidades associadas; SR. Mignon cadastrado com as 20 unidades informadas. |
+| Importação financeira | Upload XLSX/CSV com reconhecimento de cliente, documento, empresa, fechamento, vencimento, cor, pagamento e observações. |
 | Cobranças | Prioridades por cor, tentativas, histórico, contato, reagendamento, pagamento com comprovante obrigatório, cancelamento, baixa e ações em massa. |
 | Checklist diário | Natureza obrigatória (Emissão, Verificação, Execução ou Lembrete), dias configuráveis, subitens, observações e duplicação. |
 | Quinta-feira | Notas Johnson, SESI e demais clientes; produção; romaneios; etiquetas; folhas e relatórios de 17h e 20h30. |
