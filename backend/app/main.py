@@ -46,6 +46,14 @@ class PasswordBody(BaseModel):
     new_password: str
 
 
+class AdminUserBody(BaseModel):
+    name: str
+    email: str
+    role: str
+    active: bool = True
+    password: str | None = None
+
+
 def connection():
     return psycopg.connect(DATABASE_URL, autocommit=True)
 
@@ -237,6 +245,65 @@ def change_password(body: PasswordBody, user: dict[str, Any] = Depends(current_u
         new_hash = bcrypt.hashpw(body.new_password.encode(), bcrypt.gensalt()).decode()
         cursor.execute("UPDATE users SET password_hash = %s, updated_at = NOW() WHERE id = %s", (new_hash, user["id"]))
     audit(user["id"], "change_password")
+    return {"ok": True}
+
+
+@app.get("/api/admin/users")
+def admin_list_users(user: dict[str, Any] = Depends(require_admin)):
+    with connection() as conn, conn.cursor() as cursor:
+        cursor.execute("SELECT id, name, email, role, active, created_at, updated_at FROM users ORDER BY name")
+        rows = cursor.fetchall()
+    return [{"id": str(row[0]), "name": row[1], "email": row[2], "role": row[3], "active": row[4], "created_at": row[5], "updated_at": row[6]} for row in rows]
+
+
+@app.post("/api/admin/users")
+def admin_create_user(body: AdminUserBody, user: dict[str, Any] = Depends(require_admin)):
+    if not body.password or len(body.password) < 8:
+        raise HTTPException(422, "A senha inicial deve ter ao menos 8 caracteres")
+    password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+    try:
+        with connection() as conn, conn.cursor() as cursor:
+            cursor.execute("INSERT INTO users (name, email, password_hash, role, active) VALUES (%s, %s, %s, %s, %s) RETURNING id", (body.name.strip(), body.email.lower().strip(), password_hash, body.role, body.active))
+            user_id = cursor.fetchone()[0]
+    except psycopg.errors.UniqueViolation as exc:
+        raise HTTPException(409, "Já existe um usuário com este e-mail") from exc
+    audit(user["id"], "admin_user_create", {"target_id": user_id, "email": body.email.lower()})
+    return {"ok": True, "id": str(user_id)}
+
+
+@app.put("/api/admin/users/{user_key}")
+def admin_update_user(user_key: str, body: AdminUserBody, user: dict[str, Any] = Depends(require_admin)):
+    with connection() as conn, conn.cursor() as cursor:
+        if user_key.isdigit():
+            cursor.execute("SELECT id FROM users WHERE id = %s", (int(user_key),))
+        else:
+            cursor.execute("SELECT id FROM users WHERE email = %s", (body.email.lower().strip(),))
+        row = cursor.fetchone()
+        if row is None:
+            raise HTTPException(404, "Usuário de acesso ainda não existe; cadastre-o como novo")
+        target_id = row[0]
+        if body.password:
+            if len(body.password) < 8:
+                raise HTTPException(422, "A nova senha deve ter ao menos 8 caracteres")
+            password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
+            cursor.execute("UPDATE users SET name=%s, email=%s, role=%s, active=%s, password_hash=%s, updated_at=NOW() WHERE id=%s", (body.name.strip(), body.email.lower().strip(), body.role, body.active, password_hash, target_id))
+        else:
+            cursor.execute("UPDATE users SET name=%s, email=%s, role=%s, active=%s, updated_at=NOW() WHERE id=%s", (body.name.strip(), body.email.lower().strip(), body.role, body.active, target_id))
+    audit(user["id"], "admin_user_update", {"target_id": target_id})
+    return {"ok": True, "id": str(target_id)}
+
+
+@app.delete("/api/admin/users/by-email/{email}")
+def admin_delete_user(email: str, user: dict[str, Any] = Depends(require_admin)):
+    normalized = email.lower().strip()
+    if normalized == user["email"] or normalized == ADMIN_EMAIL:
+        raise HTTPException(409, "A conta administrativa em uso não pode ser apagada")
+    with connection() as conn, conn.cursor() as cursor:
+        cursor.execute("DELETE FROM users WHERE email = %s RETURNING id", (normalized,))
+        row = cursor.fetchone()
+    if row is None:
+        raise HTTPException(404, "Usuário não encontrado")
+    audit(user["id"], "admin_user_delete", {"target_id": row[0], "email": normalized})
     return {"ok": True}
 
 

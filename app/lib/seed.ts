@@ -2,8 +2,33 @@ import routeData from "@/app/data/route-data.json";
 
 export type Priority = "Verde" | "Amarelo" | "Vermelho";
 export type TaskNature = "Emissão" | "Verificação" | "Execução" | "Lembrete";
-export type ClosingFrequency = "daily" | "weekday" | "fortnightly" | "fixed_days" | "month_end_next_day";
-export type DueMode = "days_after" | "weekday_same_week" | "next_payment_day" | "fortnight_window" | "manual_table";
+export type ModuleId =
+  | "dashboard"
+  | "clientes"
+  | "financeiro"
+  | "cobrancas"
+  | "tarefas"
+  | "rotas"
+  | "documentos"
+  | "recados"
+  | "relatorios"
+  | "configuracoes";
+export type PermissionAction =
+  | "visualizar"
+  | "criar"
+  | "editar"
+  | "excluir"
+  | "aprovar"
+  | "exportar"
+  | "configurar";
+export type ClosingFrequency =
+  "daily" | "weekday" | "fortnightly" | "fixed_days" | "month_end_next_day";
+export type DueMode =
+  | "days_after"
+  | "weekday_same_week"
+  | "next_payment_day"
+  | "fortnight_window"
+  | "manual_table";
 
 export type ClosingRule = {
   id: string;
@@ -99,12 +124,25 @@ export type Collection = {
   dueDate: string;
   amount: number;
   priority: Priority;
-  status: "Pendente" | "Em andamento" | "Paga" | "Baixada" | "Reagendada" | "Cancelamento pendente" | "Arquivada";
+  status:
+    | "Pendente"
+    | "Em andamento"
+    | "Paga"
+    | "Baixada"
+    | "Reagendada"
+    | "Cancelamento pendente"
+    | "Cancelado"
+    | "Arquivada";
   responsible: string;
   nextContact: string;
   availableFrom: string;
   policyId: string;
   attempts: number;
+  proofName?: string;
+  paidAt?: string;
+  approvedBy?: string;
+  cancellationDate?: string;
+  cancellationReason?: string;
   history: { at: string; user: string; channel: string; summary: string }[];
 };
 
@@ -160,10 +198,78 @@ export type Notice = {
   createTask: boolean;
 };
 
+export type UserAccount = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  profileId: string;
+  active: boolean;
+  companies: string[];
+};
+
+export type PermissionProfile = {
+  id: string;
+  name: string;
+  description: string;
+  permissions: string[];
+  moduleAccess: Partial<Record<ModuleId, PermissionAction[]>>;
+};
+
+export type ModuleDefinition = {
+  id: ModuleId;
+  name: string;
+  description: string;
+  enabled: boolean;
+  tabs: string[];
+};
+
+export type AppearanceSettings = {
+  appName: string;
+  sidebarTitle: string;
+  tagline: string;
+  primary: string;
+  secondary: string;
+  background: string;
+  surface: string;
+  text: string;
+  radius: number;
+  density: "Compacta" | "Confortável";
+  logo: string;
+  loginBackground: string;
+  thumbnail: string;
+};
+
+export type DocumentTemplate = {
+  id: "Cotação" | "Comprovante de Entrega" | "Declaração Bancária";
+  name: string;
+  title: string;
+  introduction: string;
+  notes: string;
+  active: boolean;
+};
+
 export type Settings = {
-  companies: { name: string; document: string; email: string; phone: string; address: string; primary: string; logo: string }[];
-  users: { name: string; email: string; role: string; active: boolean }[];
-  profiles: { name: string; permissions: string[] }[];
+  companies: {
+    name: string;
+    document: string;
+    email: string;
+    phone: string;
+    address: string;
+    primary: string;
+    logo: string;
+    signature: string;
+    stamp: string;
+    bankName: string;
+    agency: string;
+    account: string;
+    beneficiary: string;
+  }[];
+  users: UserAccount[];
+  profiles: PermissionProfile[];
+  modules: ModuleDefinition[];
+  appearance: AppearanceSettings;
+  documentTemplates: DocumentTemplate[];
   paymentMethods: string[];
   sendingMethods: string[];
   closingTypes: string[];
@@ -172,7 +278,12 @@ export type Settings = {
   colorRules: ColorRule[];
   customerGroups: CustomerGroup[];
   holidays: { date: string; name: string; type: string; driverRule: string }[];
-  customFields: { entity: string; label: string; type: string; required: boolean }[];
+  customFields: {
+    entity: string;
+    label: string;
+    type: string;
+    required: boolean;
+  }[];
 };
 
 export type AppState = {
@@ -191,98 +302,1120 @@ const today = new Date().toISOString().slice(0, 10);
 
 export const seedState: AppState = {
   clients: [
-    { id: "c1", name: "SESI SJC", document: "03.774.819/0001-02", email: "financeiro@sesisjc.local", whatsapp: "(12) 99999-1101", company: "Indústria de Pães Nova Esperança", closing: "Diário", closingRuleId: "closing-daily-check", dueRule: "15 dias + próximo dia 10, 20 ou 30", dueRuleId: "due-sesi", priority: "Amarelo", colorRuleId: "color-yellow", groupId: "", requiresOrderCheck: true, payment: "Boleto", sending: "WhatsApp", issuer: "Yerardo", collectors: ["Natanael", "Willians"], billing: "Nota Fiscal + Comprovante", reminders: true, cancellationDays: 5, active: true, tags: ["educação", "grande"], notes: "Verificar no sistema de pedidos antes da emissão. Se não houver pedido, marcar Sem pedido." },
-    { id: "c2", name: "Hospital Regional", document: "12.345.678/0001-90", email: "contas@hospitalregional.local", whatsapp: "(12) 99999-2202", company: "Indústria de Pães Nova Esperança", closing: "Diário", closingRuleId: "closing-daily", dueRule: "30 dias", dueRuleId: "due-30", priority: "Vermelho", colorRuleId: "color-red", groupId: "", requiresOrderCheck: false, payment: "Transferência", sending: "E-mail", issuer: "Yerardo", collectors: ["Natanael"], billing: "Nota Fiscal", reminders: true, cancellationDays: 1, active: true, tags: ["hospital", "crítico"], notes: "Vermelho: cobrar no dia seguinte ao vencimento e encaminhar cancelamento se não pagar." },
-    { id: "c3", name: "Sodexo", document: "08.123.222/0001-10", email: "faturamento@sodexo.local", whatsapp: "(11) 99999-3303", company: "Excelência do Pão", closing: "Mensal", closingRuleId: "closing-month-end", dueRule: "Tabela mensal personalizada", dueRuleId: "due-table", priority: "Amarelo", colorRuleId: "color-yellow", groupId: "", requiresOrderCheck: false, payment: "Boleto", sending: "Portal", issuer: "Natanael", collectors: ["Natanael", "Jessica"], billing: "Nota Fiscal", reminders: false, cancellationDays: 5, active: true, tags: ["alimentação", "grupo"], notes: "Tabela de vencimento própria." },
-    { id: "c4", name: "Johnson", document: "61.074.175/0001-38", email: "suprimentos@johnson.local", whatsapp: "(12) 99999-4404", company: "Excelência do Pão", closing: "Toda quarta-feira - congelados", closingRuleId: "closing-wednesday", dueRule: "28 dias", dueRuleId: "due-28", priority: "Verde", colorRuleId: "color-green", groupId: "", requiresOrderCheck: false, payment: "Depósito", sending: "E-mail", issuer: "Willians", collectors: ["Natanael"], billing: "Nota Fiscal + Comprovante", reminders: true, cancellationDays: 7, active: true, tags: ["indústria", "johnson"], notes: "Separar pães, lanches, extras e congelados." },
-    { id: "c5", name: "Santa Casa SJC", document: "45.186.053/0001-87", email: "fiscal@santacasasjc.local", whatsapp: "(12) 99999-5505", company: "Indústria de Pães Nova Esperança", closing: "Diário", closingRuleId: "closing-daily", dueRule: "30 dias", dueRuleId: "due-30", priority: "Verde", colorRuleId: "color-green", groupId: "", requiresOrderCheck: false, payment: "Boleto", sending: "E-mail", issuer: "Willians", collectors: ["Natanael"], billing: "Nota Fiscal", reminders: true, cancellationDays: 5, active: true, tags: ["hospital"], notes: "Emissões de domingo e segunda preparadas no domingo." },
-    { id: "c6", name: "Fadel Transportes", document: "07.260.364/0002-30", email: "compras@fadel.local", whatsapp: "(12) 99999-6606", company: "Excelência do Pão", closing: "Dia 25", closingRuleId: "closing-day-25", dueRule: "30 dias", dueRuleId: "due-30", priority: "Verde", colorRuleId: "color-green", groupId: "", requiresOrderCheck: false, payment: "Pix", sending: "E-mail", issuer: "Natanael", collectors: ["Natanael"], billing: "Nota Fiscal", reminders: true, cancellationDays: 5, active: true, tags: ["logística"], notes: "Cliente usado no modelo atual de cotação." },
+    {
+      id: "c1",
+      name: "SESI SJC",
+      document: "03.774.819/0001-02",
+      email: "financeiro@sesisjc.local",
+      whatsapp: "(12) 99999-1101",
+      company: "Indústria de Pães Nova Esperança",
+      closing: "Diário",
+      closingRuleId: "closing-daily-check",
+      dueRule: "15 dias + próximo dia 10, 20 ou 30",
+      dueRuleId: "due-sesi",
+      priority: "Amarelo",
+      colorRuleId: "color-yellow",
+      groupId: "",
+      requiresOrderCheck: true,
+      payment: "Boleto",
+      sending: "WhatsApp",
+      issuer: "Yerardo",
+      collectors: ["Natanael", "Willians"],
+      billing: "Nota Fiscal + Comprovante",
+      reminders: true,
+      cancellationDays: 5,
+      active: true,
+      tags: ["educação", "grande"],
+      notes:
+        "Verificar no sistema de pedidos antes da emissão. Se não houver pedido, marcar Sem pedido.",
+    },
+    {
+      id: "c2",
+      name: "Hospital Regional",
+      document: "12.345.678/0001-90",
+      email: "contas@hospitalregional.local",
+      whatsapp: "(12) 99999-2202",
+      company: "Indústria de Pães Nova Esperança",
+      closing: "Diário",
+      closingRuleId: "closing-daily",
+      dueRule: "30 dias",
+      dueRuleId: "due-30",
+      priority: "Vermelho",
+      colorRuleId: "color-red",
+      groupId: "",
+      requiresOrderCheck: false,
+      payment: "Transferência",
+      sending: "E-mail",
+      issuer: "Yerardo",
+      collectors: ["Natanael"],
+      billing: "Nota Fiscal",
+      reminders: true,
+      cancellationDays: 1,
+      active: true,
+      tags: ["hospital", "crítico"],
+      notes:
+        "Vermelho: cobrar no dia seguinte ao vencimento e encaminhar cancelamento se não pagar.",
+    },
+    {
+      id: "c3",
+      name: "Sodexo",
+      document: "08.123.222/0001-10",
+      email: "faturamento@sodexo.local",
+      whatsapp: "(11) 99999-3303",
+      company: "Excelência do Pão",
+      closing: "Mensal",
+      closingRuleId: "closing-month-end",
+      dueRule: "Tabela mensal personalizada",
+      dueRuleId: "due-table",
+      priority: "Amarelo",
+      colorRuleId: "color-yellow",
+      groupId: "",
+      requiresOrderCheck: false,
+      payment: "Boleto",
+      sending: "Portal",
+      issuer: "Natanael",
+      collectors: ["Natanael", "Jessica"],
+      billing: "Nota Fiscal",
+      reminders: false,
+      cancellationDays: 5,
+      active: true,
+      tags: ["alimentação", "grupo"],
+      notes: "Tabela de vencimento própria.",
+    },
+    {
+      id: "c4",
+      name: "Johnson",
+      document: "61.074.175/0001-38",
+      email: "suprimentos@johnson.local",
+      whatsapp: "(12) 99999-4404",
+      company: "Excelência do Pão",
+      closing: "Toda quarta-feira - congelados",
+      closingRuleId: "closing-wednesday",
+      dueRule: "28 dias",
+      dueRuleId: "due-28",
+      priority: "Verde",
+      colorRuleId: "color-green",
+      groupId: "",
+      requiresOrderCheck: false,
+      payment: "Depósito",
+      sending: "E-mail",
+      issuer: "Willians",
+      collectors: ["Natanael"],
+      billing: "Nota Fiscal + Comprovante",
+      reminders: true,
+      cancellationDays: 7,
+      active: true,
+      tags: ["indústria", "johnson"],
+      notes: "Separar pães, lanches, extras e congelados.",
+    },
+    {
+      id: "c5",
+      name: "Santa Casa SJC",
+      document: "45.186.053/0001-87",
+      email: "fiscal@santacasasjc.local",
+      whatsapp: "(12) 99999-5505",
+      company: "Indústria de Pães Nova Esperança",
+      closing: "Diário",
+      closingRuleId: "closing-daily",
+      dueRule: "30 dias",
+      dueRuleId: "due-30",
+      priority: "Verde",
+      colorRuleId: "color-green",
+      groupId: "",
+      requiresOrderCheck: false,
+      payment: "Boleto",
+      sending: "E-mail",
+      issuer: "Willians",
+      collectors: ["Natanael"],
+      billing: "Nota Fiscal",
+      reminders: true,
+      cancellationDays: 5,
+      active: true,
+      tags: ["hospital"],
+      notes: "Emissões de domingo e segunda preparadas no domingo.",
+    },
+    {
+      id: "c6",
+      name: "Fadel Transportes",
+      document: "07.260.364/0002-30",
+      email: "compras@fadel.local",
+      whatsapp: "(12) 99999-6606",
+      company: "Excelência do Pão",
+      closing: "Dia 25",
+      closingRuleId: "closing-day-25",
+      dueRule: "30 dias",
+      dueRuleId: "due-30",
+      priority: "Verde",
+      colorRuleId: "color-green",
+      groupId: "",
+      requiresOrderCheck: false,
+      payment: "Pix",
+      sending: "E-mail",
+      issuer: "Natanael",
+      collectors: ["Natanael"],
+      billing: "Nota Fiscal",
+      reminders: true,
+      cancellationDays: 5,
+      active: true,
+      tags: ["logística"],
+      notes: "Cliente usado no modelo atual de cotação.",
+    },
   ],
   emissions: [
-    { id: "e1", clientId: "c1", scheduledDate: today, originalDate: today, company: "Indústria de Pães Nova Esperança", category: "Diário", priority: "Alta", responsible: "Yerardo", status: "Pendente", invoiceNumbers: [], dueDate: today, observation: "Verificar no sistema se existe pedido.", amount: 4850, orderCheck: "A verificar", autoGenerated: true },
-    { id: "e2", clientId: "c2", scheduledDate: today, originalDate: today, company: "Indústria de Pães Nova Esperança", category: "Diário", priority: "Alta", responsible: "Yerardo", status: "Pendente", invoiceNumbers: [], dueDate: today, observation: "", amount: 5432.1, orderCheck: "Não necessário", autoGenerated: true },
+    {
+      id: "e1",
+      clientId: "c1",
+      scheduledDate: today,
+      originalDate: today,
+      company: "Indústria de Pães Nova Esperança",
+      category: "Diário",
+      priority: "Alta",
+      responsible: "Yerardo",
+      status: "Pendente",
+      invoiceNumbers: [],
+      dueDate: today,
+      observation: "Verificar no sistema se existe pedido.",
+      amount: 4850,
+      orderCheck: "A verificar",
+      autoGenerated: true,
+    },
+    {
+      id: "e2",
+      clientId: "c2",
+      scheduledDate: today,
+      originalDate: today,
+      company: "Indústria de Pães Nova Esperança",
+      category: "Diário",
+      priority: "Alta",
+      responsible: "Yerardo",
+      status: "Pendente",
+      invoiceNumbers: [],
+      dueDate: today,
+      observation: "",
+      amount: 5432.1,
+      orderCheck: "Não necessário",
+      autoGenerated: true,
+    },
   ],
   collections: [
-    { id: "b1", clientId: "c2", invoice: "38190", dueDate: today, amount: 5432.1, priority: "Vermelho", policyId: "color-red", status: "Pendente", responsible: "Natanael", nextContact: today + "T08:00", availableFrom: today, attempts: 0, history: [] },
-    { id: "b2", clientId: "c1", invoice: "38177", dueDate: today, amount: 4850, priority: "Amarelo", policyId: "color-yellow", status: "Pendente", responsible: "Natanael", nextContact: today + "T14:00", availableFrom: today, attempts: 0, history: [] },
+    {
+      id: "b1",
+      clientId: "c2",
+      invoice: "38190",
+      dueDate: today,
+      amount: 5432.1,
+      priority: "Vermelho",
+      policyId: "color-red",
+      status: "Pendente",
+      responsible: "Natanael",
+      nextContact: today + "T08:00",
+      availableFrom: today,
+      attempts: 0,
+      history: [],
+    },
+    {
+      id: "b2",
+      clientId: "c1",
+      invoice: "38177",
+      dueDate: today,
+      amount: 4850,
+      priority: "Amarelo",
+      policyId: "color-yellow",
+      status: "Pendente",
+      responsible: "Natanael",
+      nextContact: today + "T14:00",
+      availableFrom: today,
+      attempts: 0,
+      history: [],
+    },
   ],
   tasks: [
-    { id: "t1", title: "Emitir notas JOHNSON", category: "Notas Fiscais", nature: "Emissão", days: ["Quinta", "Domingo"], responsible: "Willians", time: "07:00", priority: "Alta", notes: "Separar Johnson, extras, lanches, congelados e pães franceses.", subitems: ["Johnson", "Johnson extras", "Johnson congelados", "Johnson pães com margarina", "Johnson lanches", "Johnson pão francês"], completed: false },
-    { id: "t2", title: "Verificar notas SESI", category: "Notas Fiscais", nature: "Verificação", days: ["Quinta", "Domingo"], responsible: "Willians", time: "08:00", priority: "Alta", notes: "Verificar quais notas já foram emitidas por terceiros.", subitems: ["Jacareí", "SJC", "Caçapava", "Pinda", "Taubaté", "Cruzeiro", "Lorena", "Guarulhos"], completed: false },
-    { id: "t3", title: "Emitir notas de quinta-feira", category: "Notas Fiscais", nature: "Emissão", days: ["Quinta"], responsible: "Willians", time: "08:30", priority: "Alta", notes: "Tarefas recorrentes exclusivas de quinta.", subitems: ["Toder", "Plastic", "Alojamento", "César", "Gerdau", "Brazul", "Iramec", "Santa Casa SJC", "Embraer / Gláucia / Marinela", "Etec"], completed: false },
-    { id: "t4", title: "Produção de pão francês", category: "Produção", nature: "Execução", days: ["Quinta", "Sábado", "Domingo"], responsible: "Willians", time: "10:00", priority: "Média", notes: "No sábado produzir para domingo; no domingo, para segunda.", subitems: ["Francês", "Mini", "Baguete 70g", "Baguete 120g", "Baguete 400g", "Integral", "Mini integral"], completed: false },
-    { id: "t5", title: "Produção de pão doce, bolos e confeitaria", category: "Produção", nature: "Execução", days: ["Quinta", "Domingo"], responsible: "Willians", time: "11:00", priority: "Média", notes: "Produção de domingo destinada à segunda-feira.", subitems: ["Pães doces", "Bolos", "Confeitaria"], completed: false },
-    { id: "t6", title: "Romaneios de entregas", category: "Romaneios", nature: "Lembrete", days: ["Quinta", "Domingo"], responsible: "Willians", time: "14:00", priority: "Alta", notes: "Emitir via sistema externo. No domingo preparar domingo e segunda.", subitems: ["Entregas de domingo", "Entregas de segunda"], completed: false },
-    { id: "t7", title: "Conferir etiquetas e folhas", category: "Etiquetas e Folhas", nature: "Verificação", days: ["Quinta", "Sábado", "Domingo"], responsible: "Willians", time: "15:00", priority: "Alta", notes: "Checklist antes da liberação.", subitems: ["Johnson", "Igaratá", "Paraibuna + conferência motorista", "Santa Branca", "Merendas SJC", "Tremembé", "Jaguariúna"], completed: false },
-    { id: "t8", title: "Relatórios de produtos - líderes", category: "Relatórios", nature: "Execução", days: ["Sábado"], responsible: "Willians", time: "14:00", priority: "Média", notes: "Elaborar relatórios dos líderes para 14h e 21h, incluindo FDS.", subitems: ["Relatório 14h", "Relatório 21h", "Relatório FDS"], completed: false },
-    { id: "t9", title: "Relatórios de compras", category: "Relatórios", nature: "Execução", days: ["Quinta"], responsible: "Willians", time: "17:00", priority: "Média", notes: "Emitir relatórios nos dois horários.", subitems: ["Relatório 17h00", "Relatório 20h30"], completed: false },
-    { id: "t10", title: "Conferir pedidos com alteração", category: "Conferência", nature: "Verificação", days: ["Sábado", "Domingo"], responsible: "Willians", time: "16:00", priority: "Alta", notes: "Usar planilhas e conferir quadro de OK para cadastros.", subitems: ["Hospital São José", "Vivalle", "Pró Infância", "Santa Casa SJC", "Hospital Santos Dumont", "Francisca Júlia"], completed: false },
-    { id: "t11", title: "Emitir notas de domingo e segunda", category: "Notas Fiscais", nature: "Emissão", days: ["Domingo"], responsible: "Willians", time: "06:30", priority: "Alta", notes: "As notas de segunda são preparadas no domingo com vencimento/competência de segunda.", subitems: ["Oxiteno", "Jarinu", "Santa Casa SJC - domingo", "Santa Casa SJC - segunda", "Vivalle - domingo", "Vivalle - segunda"], completed: false },
+    {
+      id: "t1",
+      title: "Emitir notas JOHNSON",
+      category: "Notas Fiscais",
+      nature: "Emissão",
+      days: ["Quinta", "Domingo"],
+      responsible: "Willians",
+      time: "07:00",
+      priority: "Alta",
+      notes: "Separar Johnson, extras, lanches, congelados e pães franceses.",
+      subitems: [
+        "Johnson",
+        "Johnson extras",
+        "Johnson congelados",
+        "Johnson pães com margarina",
+        "Johnson lanches",
+        "Johnson pão francês",
+      ],
+      completed: false,
+    },
+    {
+      id: "t2",
+      title: "Verificar notas SESI",
+      category: "Notas Fiscais",
+      nature: "Verificação",
+      days: ["Quinta", "Domingo"],
+      responsible: "Willians",
+      time: "08:00",
+      priority: "Alta",
+      notes: "Verificar quais notas já foram emitidas por terceiros.",
+      subitems: [
+        "Jacareí",
+        "SJC",
+        "Caçapava",
+        "Pinda",
+        "Taubaté",
+        "Cruzeiro",
+        "Lorena",
+        "Guarulhos",
+      ],
+      completed: false,
+    },
+    {
+      id: "t3",
+      title: "Emitir notas de quinta-feira",
+      category: "Notas Fiscais",
+      nature: "Emissão",
+      days: ["Quinta"],
+      responsible: "Willians",
+      time: "08:30",
+      priority: "Alta",
+      notes: "Tarefas recorrentes exclusivas de quinta.",
+      subitems: [
+        "Toder",
+        "Plastic",
+        "Alojamento",
+        "César",
+        "Gerdau",
+        "Brazul",
+        "Iramec",
+        "Santa Casa SJC",
+        "Embraer / Gláucia / Marinela",
+        "Etec",
+      ],
+      completed: false,
+    },
+    {
+      id: "t4",
+      title: "Produção de pão francês",
+      category: "Produção",
+      nature: "Execução",
+      days: ["Quinta", "Sábado", "Domingo"],
+      responsible: "Willians",
+      time: "10:00",
+      priority: "Média",
+      notes: "No sábado produzir para domingo; no domingo, para segunda.",
+      subitems: [
+        "Francês",
+        "Mini",
+        "Baguete 70g",
+        "Baguete 120g",
+        "Baguete 400g",
+        "Integral",
+        "Mini integral",
+      ],
+      completed: false,
+    },
+    {
+      id: "t5",
+      title: "Produção de pão doce, bolos e confeitaria",
+      category: "Produção",
+      nature: "Execução",
+      days: ["Quinta", "Domingo"],
+      responsible: "Willians",
+      time: "11:00",
+      priority: "Média",
+      notes: "Produção de domingo destinada à segunda-feira.",
+      subitems: ["Pães doces", "Bolos", "Confeitaria"],
+      completed: false,
+    },
+    {
+      id: "t6",
+      title: "Romaneios de entregas",
+      category: "Romaneios",
+      nature: "Lembrete",
+      days: ["Quinta", "Domingo"],
+      responsible: "Willians",
+      time: "14:00",
+      priority: "Alta",
+      notes:
+        "Emitir via sistema externo. No domingo preparar domingo e segunda.",
+      subitems: ["Entregas de domingo", "Entregas de segunda"],
+      completed: false,
+    },
+    {
+      id: "t7",
+      title: "Conferir etiquetas e folhas",
+      category: "Etiquetas e Folhas",
+      nature: "Verificação",
+      days: ["Quinta", "Sábado", "Domingo"],
+      responsible: "Willians",
+      time: "15:00",
+      priority: "Alta",
+      notes: "Checklist antes da liberação.",
+      subitems: [
+        "Johnson pães com margarina",
+        "Johnson lanches",
+        "Igaratá",
+        "Paraibuna + conferência motorista",
+        "Folha de Santa Branca",
+        "Folha de entregas das merendas de SJC",
+        "Folha de entrega Merenda Tremembé",
+        "Folha Jaguariúna",
+        "Relatórios de merendas",
+      ],
+      completed: false,
+    },
+    {
+      id: "t8",
+      title: "Relatórios de produtos - líderes",
+      category: "Relatórios",
+      nature: "Execução",
+      days: ["Sábado"],
+      responsible: "Willians",
+      time: "14:00",
+      priority: "Média",
+      notes: "Elaborar relatórios dos líderes para 14h e 21h, incluindo FDS.",
+      subitems: ["Relatório 14h", "Relatório 21h", "Relatório FDS"],
+      completed: false,
+    },
+    {
+      id: "t9",
+      title: "Relatórios de compras",
+      category: "Relatórios",
+      nature: "Execução",
+      days: ["Quinta"],
+      responsible: "Willians",
+      time: "17:00",
+      priority: "Média",
+      notes: "Emitir relatórios nos dois horários.",
+      subitems: ["Relatório 17h00", "Relatório 20h30"],
+      completed: false,
+    },
+    {
+      id: "t10",
+      title: "Conferir pedidos com alteração",
+      category: "Conferência",
+      nature: "Verificação",
+      days: ["Sábado", "Domingo"],
+      responsible: "Willians",
+      time: "16:00",
+      priority: "Alta",
+      notes: "Usar planilhas e conferir quadro de OK para cadastros.",
+      subitems: [
+        "Hospital São José",
+        "Vivalle",
+        "Pró Infância",
+        "Santa Casa SJC",
+        "Hospital Santos Dumont",
+        "Francisca Júlia",
+      ],
+      completed: false,
+    },
+    {
+      id: "t11",
+      title: "Emitir notas de domingo e segunda",
+      category: "Notas Fiscais",
+      nature: "Emissão",
+      days: ["Domingo"],
+      responsible: "Willians",
+      time: "06:30",
+      priority: "Alta",
+      notes:
+        "As notas de segunda são preparadas no domingo com vencimento/competência de segunda.",
+      subitems: [
+        "Oxiteno",
+        "Jarinu",
+        "Santa Casa SJC - domingo",
+        "Santa Casa SJC - segunda",
+        "Vivalle - domingo",
+        "Vivalle - segunda",
+        "Johnson pães com margarina",
+        "Johnson lanches",
+        "Johnson pedidos extras",
+        "Johnson congelados",
+        "Johnson pães franceses",
+      ],
+      completed: false,
+    },
   ],
   routes: routeData.records as RouteRecord[],
   documents: [
-    { id: "d1", type: "Cotação", company: "Indústria de Pães Nova Esperança", client: "SESI Taubaté", date: "2026-07-29", total: 256, status: "Finalizado" },
-    { id: "d2", type: "Cotação", company: "Excelência do Pão", client: "Fadel Transportes", date: "2025-02-28", total: 285, status: "Finalizado" },
-    { id: "d3", type: "Comprovante de Entrega", company: "Indústria de Pães Nova Esperança", client: "São José dos Campos", date: "2026-08-27", total: 0, status: "Gerado" },
+    {
+      id: "d1",
+      type: "Cotação",
+      company: "Indústria de Pães Nova Esperança",
+      client: "SESI Taubaté",
+      date: "2026-07-29",
+      total: 256,
+      status: "Finalizado",
+    },
+    {
+      id: "d2",
+      type: "Cotação",
+      company: "Excelência do Pão",
+      client: "Fadel Transportes",
+      date: "2025-02-28",
+      total: 285,
+      status: "Finalizado",
+    },
+    {
+      id: "d3",
+      type: "Comprovante de Entrega",
+      company: "Indústria de Pães Nova Esperança",
+      client: "São José dos Campos",
+      date: "2026-08-27",
+      total: 0,
+      status: "Gerado",
+    },
   ],
   notices: [
-    { id: "n1", text: "Cliente Sodexo solicitou renegociação. Aguardar análise da diretoria.", sender: "Natanael", recipients: ["Jessica", "Marcelo"], priority: "Alta", status: "Pendente", clientId: "c3", createdAt: "2026-08-26T08:30", createTask: false },
-    { id: "n2", text: "Conferir alterações do Hospital São José antes de cadastrar o fim de semana.", sender: "Jessica", recipients: ["Willians"], priority: "Alta", status: "Em andamento", clientId: "c5", createdAt: "2026-08-25T17:10", createTask: true },
+    {
+      id: "n1",
+      text: "Cliente Sodexo solicitou renegociação. Aguardar análise da diretoria.",
+      sender: "Natanael",
+      recipients: ["Jessica", "Marcelo"],
+      priority: "Alta",
+      status: "Pendente",
+      clientId: "c3",
+      createdAt: "2026-08-26T08:30",
+      createTask: false,
+    },
+    {
+      id: "n2",
+      text: "Conferir alterações do Hospital São José antes de cadastrar o fim de semana.",
+      sender: "Jessica",
+      recipients: ["Willians"],
+      priority: "Alta",
+      status: "Em andamento",
+      clientId: "c5",
+      createdAt: "2026-08-25T17:10",
+      createTask: true,
+    },
   ],
   settings: {
     companies: [
-      { name: "Indústria de Pães Nova Esperança", document: "73.066.045/0001-32", email: "contato@paesnovaesperanca.com.br", phone: "(12) 3903-6462", address: "Avenida Dois, 181, Eldorado, São José dos Campos - SP, 12238-580", primary: "#c96520", logo: "/brand/nova-esperanca.jpg" },
-      { name: "Excelência do Pão", document: "07.260.364/0001-50", email: "excelenciadopao@hotmail.com", phone: "(12) 3204-7902", address: "Avenida Leonor de Almeida Ribeiro Souto, 227, Residencial União, São José dos Campos - SP", primary: "#b6862e", logo: "/brand/excelencia-do-pao.png" },
+      {
+        name: "Indústria de Pães Nova Esperança",
+        document: "73.066.045/0001-32",
+        email: "contato@paesnovaesperanca.com.br",
+        phone: "(12) 3903-6462",
+        address:
+          "Avenida Dois, 181, Eldorado, São José dos Campos - SP, 12238-580",
+        primary: "#c96520",
+        logo: "/brand/nova-esperanca.jpg",
+        signature: "/brand/assinatura-yerardo.png",
+        stamp: "/brand/carimbo-nova-esperanca.png",
+        bankName: "Banco Bradesco",
+        agency: "0225",
+        account: "27240-0",
+        beneficiary: "Pereira Martins Panificadora Industrial LTDA",
+      },
+      {
+        name: "Excelência do Pão",
+        document: "07.260.364/0001-50",
+        email: "excelenciadopao@hotmail.com",
+        phone: "(12) 3204-7902",
+        address:
+          "Avenida Leonor de Almeida Ribeiro Souto, 227, Residencial União, São José dos Campos - SP",
+        primary: "#b6862e",
+        logo: "/brand/excelencia-do-pao.png",
+        signature: "/brand/assinatura-excelencia.png",
+        stamp: "",
+        bankName: "Banco Bradesco",
+        agency: "0225",
+        account: "27240-0",
+        beneficiary: "Excelência do Pão",
+      },
     ],
     users: [
-      { name: "Administrador", email: "admin@gestao.local", role: "Administrador", active: true },
-      { name: "Yerardo", email: "yerardo@gestao.local", role: "Financeiro principal", active: true },
-      { name: "Natanael", email: "natanael@gestao.local", role: "Cobranças", active: true },
-      { name: "Willians", email: "willians@gestao.local", role: "Operações", active: true },
-      { name: "Jessica", email: "jessica@gestao.local", role: "Diretoria", active: true },
-      { name: "Marcelo", email: "marcelo@gestao.local", role: "Diretoria", active: true },
+      {
+        id: "u-admin",
+        name: "Administrador",
+        email: "admin@gestao.local",
+        role: "Administrador",
+        profileId: "profile-admin",
+        active: true,
+        companies: ["*"],
+      },
+      {
+        id: "u-yerardo",
+        name: "Yerardo",
+        email: "yerardo@gestao.local",
+        role: "Financeiro principal",
+        profileId: "profile-financeiro",
+        active: true,
+        companies: ["*"],
+      },
+      {
+        id: "u-natanael",
+        name: "Natanael",
+        email: "natanael@gestao.local",
+        role: "Cobranças",
+        profileId: "profile-cobrancas",
+        active: true,
+        companies: ["*"],
+      },
+      {
+        id: "u-willians",
+        name: "Willians",
+        email: "willians@gestao.local",
+        role: "Operações",
+        profileId: "profile-operacoes",
+        active: true,
+        companies: ["*"],
+      },
+      {
+        id: "u-jessica",
+        name: "Jessica",
+        email: "jessica@gestao.local",
+        role: "Diretoria",
+        profileId: "profile-diretoria",
+        active: true,
+        companies: ["*"],
+      },
+      {
+        id: "u-marcelo",
+        name: "Marcelo",
+        email: "marcelo@gestao.local",
+        role: "Diretoria",
+        profileId: "profile-diretoria",
+        active: true,
+        companies: ["*"],
+      },
     ],
     profiles: [
-      { name: "Administrador", permissions: ["todos"] },
-      { name: "Financeiro principal", permissions: ["cliente:ler", "nota:criar", "nota:atualizar", "relatorio:ler"] },
-      { name: "Cobranças", permissions: ["cobranca:criar", "cobranca:atualizar", "pagamento:registrar", "relatorio:ler"] },
-      { name: "Operações", permissions: ["tarefa:atualizar", "rota:atualizar", "cancelamento:confirmar", "documento:criar"] },
-      { name: "Diretoria", permissions: ["todos:ler", "pagamento:baixar", "cancelamento:aprovar", "relatorio:ler"] },
+      {
+        id: "profile-admin",
+        name: "Administrador",
+        description:
+          "Acesso total, inclusive criação de perfis e personalização.",
+        permissions: ["todos"],
+        moduleAccess: {
+          dashboard: ["visualizar", "configurar"],
+          clientes: ["visualizar", "criar", "editar", "excluir", "configurar"],
+          financeiro: [
+            "visualizar",
+            "criar",
+            "editar",
+            "excluir",
+            "aprovar",
+            "exportar",
+            "configurar",
+          ],
+          cobrancas: [
+            "visualizar",
+            "criar",
+            "editar",
+            "excluir",
+            "aprovar",
+            "exportar",
+            "configurar",
+          ],
+          tarefas: [
+            "visualizar",
+            "criar",
+            "editar",
+            "excluir",
+            "aprovar",
+            "configurar",
+          ],
+          rotas: [
+            "visualizar",
+            "criar",
+            "editar",
+            "excluir",
+            "aprovar",
+            "exportar",
+            "configurar",
+          ],
+          documentos: [
+            "visualizar",
+            "criar",
+            "editar",
+            "excluir",
+            "exportar",
+            "configurar",
+          ],
+          recados: ["visualizar", "criar", "editar", "excluir"],
+          relatorios: ["visualizar", "exportar"],
+          configuracoes: [
+            "visualizar",
+            "criar",
+            "editar",
+            "excluir",
+            "aprovar",
+            "configurar",
+          ],
+        },
+      },
+      {
+        id: "profile-financeiro",
+        name: "Financeiro principal",
+        description: "Emissão de notas, agenda financeira e acompanhamento.",
+        permissions: [
+          "cliente:ler",
+          "nota:criar",
+          "nota:atualizar",
+          "relatorio:ler",
+        ],
+        moduleAccess: {
+          dashboard: ["visualizar"],
+          clientes: ["visualizar", "editar"],
+          financeiro: ["visualizar", "criar", "editar", "exportar"],
+          cobrancas: ["visualizar"],
+          documentos: ["visualizar", "criar", "exportar"],
+          recados: ["visualizar", "criar"],
+          relatorios: ["visualizar"],
+        },
+      },
+      {
+        id: "profile-cobrancas",
+        name: "Cobranças",
+        description:
+          "Fila, calendário, contatos, comprovantes e reagendamentos.",
+        permissions: [
+          "cobranca:criar",
+          "cobranca:atualizar",
+          "pagamento:registrar",
+          "relatorio:ler",
+        ],
+        moduleAccess: {
+          dashboard: ["visualizar"],
+          clientes: ["visualizar", "editar"],
+          financeiro: ["visualizar"],
+          cobrancas: ["visualizar", "criar", "editar"],
+          recados: ["visualizar", "criar"],
+          relatorios: ["visualizar"],
+        },
+      },
+      {
+        id: "profile-operacoes",
+        name: "Operações",
+        description:
+          "Checklist, conferências, rotas, documentos e cancelamentos.",
+        permissions: [
+          "tarefa:atualizar",
+          "rota:atualizar",
+          "cancelamento:confirmar",
+          "documento:criar",
+        ],
+        moduleAccess: {
+          dashboard: ["visualizar"],
+          clientes: ["visualizar"],
+          cobrancas: ["visualizar", "editar"],
+          tarefas: ["visualizar", "criar", "editar"],
+          rotas: ["visualizar", "criar", "editar", "aprovar"],
+          documentos: ["visualizar", "criar", "exportar"],
+          recados: ["visualizar", "criar"],
+        },
+      },
+      {
+        id: "profile-diretoria",
+        name: "Diretoria",
+        description:
+          "Visão geral, baixa final, negociação e aprovação de cancelamentos.",
+        permissions: [
+          "todos:ler",
+          "pagamento:baixar",
+          "cancelamento:aprovar",
+          "relatorio:ler",
+        ],
+        moduleAccess: {
+          dashboard: ["visualizar"],
+          clientes: ["visualizar"],
+          financeiro: ["visualizar"],
+          cobrancas: ["visualizar", "aprovar"],
+          tarefas: ["visualizar"],
+          rotas: ["visualizar"],
+          documentos: ["visualizar"],
+          recados: ["visualizar", "criar"],
+          relatorios: ["visualizar", "exportar"],
+        },
+      },
     ],
-    paymentMethods: ["Boleto", "Pix", "Depósito", "Transferência", "Dinheiro", "Cartão"],
+    modules: [
+      {
+        id: "dashboard",
+        name: "Visão geral",
+        description: "Indicadores e prioridades de toda a operação.",
+        enabled: true,
+        tabs: ["Resumo", "Atividade"],
+      },
+      {
+        id: "clientes",
+        name: "Clientes",
+        description: "Cadastro unificado, grupos, responsáveis e regras.",
+        enabled: true,
+        tabs: ["Lista", "Grupos", "Importação"],
+      },
+      {
+        id: "financeiro",
+        name: "Financeiro",
+        description: "Agenda de fechamento, emissão e faturas.",
+        enabled: true,
+        tabs: [
+          "Painel",
+          "Calendário",
+          "Contas a emitir",
+          "Histórico",
+          "Relatórios",
+        ],
+      },
+      {
+        id: "cobrancas",
+        name: "Cobranças",
+        description: "Fila, histórico, comprovantes, baixa e cancelamento.",
+        enabled: true,
+        tabs: ["Painel", "Calendário", "Fila", "Histórico", "Cancelamentos"],
+      },
+      {
+        id: "tarefas",
+        name: "Tarefas",
+        description: "Checklist, recorrências e planner da equipe.",
+        enabled: true,
+        tabs: ["Meu dia", "Planner", "Catálogo", "Recorrências", "Indicadores"],
+      },
+      {
+        id: "rotas",
+        name: "Base de rotas",
+        description: "Base oficial para cadastro no sistema de pedidos.",
+        enabled: true,
+        tabs: [
+          "Cadastrar hoje",
+          "Bases mensais",
+          "Regras",
+          "Divergências",
+          "Indicadores",
+        ],
+      },
+      {
+        id: "documentos",
+        name: "Documentos",
+        description: "Geradores, modelos e histórico corporativo.",
+        enabled: true,
+        tabs: ["Biblioteca", "Geradores", "Modelos", "Histórico"],
+      },
+      {
+        id: "recados",
+        name: "Recados",
+        description: "Comunicação vinculada a clientes e fluxos.",
+        enabled: true,
+        tabs: ["Caixa de entrada", "Enviados"],
+      },
+      {
+        id: "relatorios",
+        name: "Relatórios",
+        description: "Indicadores gerenciais dos módulos.",
+        enabled: true,
+        tabs: ["Financeiro", "Cobranças", "Tarefas", "Rotas"],
+      },
+      {
+        id: "configuracoes",
+        name: "Administração",
+        description: "Usuários, perfis, módulos e personalização.",
+        enabled: true,
+        tabs: [
+          "Identidade",
+          "Usuários",
+          "Perfis",
+          "Módulos",
+          "Campos",
+          "Segurança",
+        ],
+      },
+    ],
+    appearance: {
+      appName: "Gestão Operacional",
+      sidebarTitle: "Gestão Operacional",
+      tagline: "Um único lugar para organizar o que move a operação.",
+      primary: "#c96520",
+      secondary: "#17324d",
+      background: "#f5f1ec",
+      surface: "#ffffff",
+      text: "#1d2835",
+      radius: 14,
+      density: "Confortável",
+      logo: "/brand/nova-esperanca.jpg",
+      loginBackground: "",
+      thumbnail: "/brand/nova-esperanca.jpg",
+    },
+    documentTemplates: [
+      {
+        id: "Cotação",
+        name: "Cotação / Proposta",
+        title: "Proposta comercial",
+        introduction:
+          "apresenta sua proposta comercial para o fornecimento dos itens abaixo.",
+        notes:
+          "Os valores incluem custos operacionais, transporte e encargos incidentes no fornecimento. Validade: 90 dias. Pagamento: 30 dias.",
+        active: true,
+      },
+      {
+        id: "Comprovante de Entrega",
+        name: "Comprovante de Entrega",
+        title: "COMPROVANTE DE ENTREGA",
+        introduction: "Relação dos itens entregues no local e data informados.",
+        notes: "Recebimento sujeito à assinatura e conferência do responsável.",
+        active: true,
+      },
+      {
+        id: "Declaração Bancária",
+        name: "Declaração de Dados Bancários",
+        title: "DECLARAÇÃO DE DADOS BANCÁRIOS",
+        introduction: "Declaramos os dados bancários para o crédito informado.",
+        notes: "Documento emitido pela empresa selecionada.",
+        active: true,
+      },
+    ],
+    paymentMethods: [
+      "Boleto",
+      "Pix",
+      "Depósito",
+      "Transferência",
+      "Dinheiro",
+      "Cartão",
+    ],
     sendingMethods: ["E-mail", "WhatsApp", "Mensagem", "Portal", "Outro"],
-    closingTypes: ["Diário", "Toda segunda-feira", "Toda quarta-feira - congelados", "Toda sexta-feira", "Quinzenal", "Dia fixo", "Mensal - 1º dia do próximo mês"],
+    closingTypes: [
+      "Diário",
+      "Toda segunda-feira",
+      "Toda quarta-feira - congelados",
+      "Toda sexta-feira",
+      "Quinzenal",
+      "Dia fixo",
+      "Mensal - 1º dia do próximo mês",
+    ],
     closingRules: [
-      { id: "closing-daily", name: "Diário", frequency: "daily", weekdays: [], daysOfMonth: [], requiresOrderCheck: false, active: true },
-      { id: "closing-daily-check", name: "Diário - verificar pedido", frequency: "daily", weekdays: [], daysOfMonth: [], requiresOrderCheck: true, active: true },
-      { id: "closing-monday", name: "Toda segunda-feira", frequency: "weekday", weekdays: [1], daysOfMonth: [], requiresOrderCheck: false, active: true },
-      { id: "closing-wednesday", name: "Toda quarta-feira - congelados", frequency: "weekday", weekdays: [3], daysOfMonth: [], requiresOrderCheck: false, active: true },
-      { id: "closing-friday", name: "Toda sexta-feira", frequency: "weekday", weekdays: [5], daysOfMonth: [], requiresOrderCheck: false, active: true },
-      { id: "closing-fortnight", name: "Quinzenal - dia 15 e último dia", frequency: "fortnightly", weekdays: [], daysOfMonth: [15], requiresOrderCheck: false, active: true },
-      { id: "closing-day-20", name: "Dia 20", frequency: "fixed_days", weekdays: [], daysOfMonth: [20], requiresOrderCheck: false, active: true },
-      { id: "closing-day-25", name: "Dia 25", frequency: "fixed_days", weekdays: [], daysOfMonth: [25], requiresOrderCheck: false, active: true },
-      { id: "closing-month-end", name: "Mensal - emitir no 1º dia do próximo mês", frequency: "month_end_next_day", weekdays: [], daysOfMonth: [], requiresOrderCheck: false, active: true },
+      {
+        id: "closing-daily",
+        name: "Diário",
+        frequency: "daily",
+        weekdays: [],
+        daysOfMonth: [],
+        requiresOrderCheck: false,
+        active: true,
+      },
+      {
+        id: "closing-daily-check",
+        name: "Diário - verificar pedido",
+        frequency: "daily",
+        weekdays: [],
+        daysOfMonth: [],
+        requiresOrderCheck: true,
+        active: true,
+      },
+      {
+        id: "closing-monday",
+        name: "Toda segunda-feira",
+        frequency: "weekday",
+        weekdays: [1],
+        daysOfMonth: [],
+        requiresOrderCheck: false,
+        active: true,
+      },
+      {
+        id: "closing-wednesday",
+        name: "Toda quarta-feira - congelados",
+        frequency: "weekday",
+        weekdays: [3],
+        daysOfMonth: [],
+        requiresOrderCheck: false,
+        active: true,
+      },
+      {
+        id: "closing-friday",
+        name: "Toda sexta-feira",
+        frequency: "weekday",
+        weekdays: [5],
+        daysOfMonth: [],
+        requiresOrderCheck: false,
+        active: true,
+      },
+      {
+        id: "closing-fortnight",
+        name: "Quinzenal - dia 15 e último dia",
+        frequency: "fortnightly",
+        weekdays: [],
+        daysOfMonth: [15],
+        requiresOrderCheck: false,
+        active: true,
+      },
+      {
+        id: "closing-day-20",
+        name: "Dia 20",
+        frequency: "fixed_days",
+        weekdays: [],
+        daysOfMonth: [20],
+        requiresOrderCheck: false,
+        active: true,
+      },
+      {
+        id: "closing-day-25",
+        name: "Dia 25",
+        frequency: "fixed_days",
+        weekdays: [],
+        daysOfMonth: [25],
+        requiresOrderCheck: false,
+        active: true,
+      },
+      {
+        id: "closing-month-end",
+        name: "Mensal - emitir no 1º dia do próximo mês",
+        frequency: "month_end_next_day",
+        weekdays: [],
+        daysOfMonth: [],
+        requiresOrderCheck: false,
+        active: true,
+      },
     ],
     dueRules: [
-      { id: "due-15", name: "15 dias", mode: "days_after", days: 15, weekday: 0, paymentDays: [], active: true },
-      { id: "due-28", name: "28 dias", mode: "days_after", days: 28, weekday: 0, paymentDays: [], active: true },
-      { id: "due-30", name: "30 dias", mode: "days_after", days: 30, weekday: 0, paymentDays: [], active: true },
-      { id: "due-same-wednesday", name: "Quarta-feira da mesma semana", mode: "weekday_same_week", days: 0, weekday: 3, paymentDays: [], active: true },
-      { id: "due-sesi", name: "15 dias + próximo dia 10, 20 ou 30", mode: "next_payment_day", days: 15, weekday: 0, paymentDays: [10, 20, 30], active: true },
-      { id: "due-fortnight", name: "Fechamento 1-15 vence dia 30; 16-fim vence dia 15", mode: "fortnight_window", days: 0, weekday: 0, paymentDays: [15, 30], active: true },
-      { id: "due-table", name: "Tabela mensal personalizada", mode: "manual_table", days: 0, weekday: 0, paymentDays: [], active: true },
+      {
+        id: "due-15",
+        name: "15 dias",
+        mode: "days_after",
+        days: 15,
+        weekday: 0,
+        paymentDays: [],
+        active: true,
+      },
+      {
+        id: "due-28",
+        name: "28 dias",
+        mode: "days_after",
+        days: 28,
+        weekday: 0,
+        paymentDays: [],
+        active: true,
+      },
+      {
+        id: "due-30",
+        name: "30 dias",
+        mode: "days_after",
+        days: 30,
+        weekday: 0,
+        paymentDays: [],
+        active: true,
+      },
+      {
+        id: "due-same-wednesday",
+        name: "Quarta-feira da mesma semana",
+        mode: "weekday_same_week",
+        days: 0,
+        weekday: 3,
+        paymentDays: [],
+        active: true,
+      },
+      {
+        id: "due-sesi",
+        name: "15 dias + próximo dia 10, 20 ou 30",
+        mode: "next_payment_day",
+        days: 15,
+        weekday: 0,
+        paymentDays: [10, 20, 30],
+        active: true,
+      },
+      {
+        id: "due-fortnight",
+        name: "Fechamento 1-15 vence dia 30; 16-fim vence dia 15",
+        mode: "fortnight_window",
+        days: 0,
+        weekday: 0,
+        paymentDays: [15, 30],
+        active: true,
+      },
+      {
+        id: "due-table",
+        name: "Tabela mensal personalizada",
+        mode: "manual_table",
+        days: 0,
+        weekday: 0,
+        paymentDays: [],
+        active: true,
+      },
     ],
     colorRules: [
-      { id: "color-red", name: "Vermelho", color: "#dc2626", maxOpenPending: 0, allowSupply: false, collectionDelayDays: 1, cancelAfterUnpaid: true, action: "Nenhuma pendência vencida permitida. Cobrar imediatamente no dia seguinte; sem pagamento, encaminhar cancelamento.", priority: 1 },
-      { id: "color-yellow", name: "Amarelo", color: "#d97706", maxOpenPending: 2, allowSupply: true, collectionDelayDays: 1, cancelAfterUnpaid: true, action: "Até duas pendências vencidas em aberto; cobrança no dia seguinte e atenção ao limite.", priority: 2 },
-      { id: "color-green", name: "Verde", color: "#15803d", maxOpenPending: null, allowSupply: true, collectionDelayDays: 1, cancelAfterUnpaid: false, action: "Pode ter várias pendências. Cobrança normal, sem cancelamento automático das entregas.", priority: 3 },
+      {
+        id: "color-red",
+        name: "Vermelho",
+        color: "#dc2626",
+        maxOpenPending: 0,
+        allowSupply: false,
+        collectionDelayDays: 1,
+        cancelAfterUnpaid: true,
+        action:
+          "Nenhuma pendência vencida permitida. Cobrar imediatamente no dia seguinte; sem pagamento, encaminhar cancelamento.",
+        priority: 1,
+      },
+      {
+        id: "color-yellow",
+        name: "Amarelo",
+        color: "#d97706",
+        maxOpenPending: 2,
+        allowSupply: true,
+        collectionDelayDays: 1,
+        cancelAfterUnpaid: true,
+        action:
+          "Até duas pendências vencidas em aberto; cobrança no dia seguinte e atenção ao limite.",
+        priority: 2,
+      },
+      {
+        id: "color-green",
+        name: "Verde",
+        color: "#15803d",
+        maxOpenPending: null,
+        allowSupply: true,
+        collectionDelayDays: 1,
+        cancelAfterUnpaid: false,
+        action:
+          "Pode ter várias pendências. Cobrança normal, sem cancelamento automático das entregas.",
+        priority: 3,
+      },
     ],
     customerGroups: [
-      { id: "group-sr-mignon", name: "SR. Mignon", payerName: "SR. Mignon", inheritRules: true, units: ["Sr. Mignon Sede Nova", "Sr. Mignon Astronautas", "Prolind", "BCA", "Sr. Mignon Chácaras", "Safran", "Fantástico", "Globo Jambeiro", "Adatex Filial", "Adatex Matriz", "Vetcia", "Sany", "Cherry", "NHJ", "Premovale", "Legado Usimagem", "Armavale", "Larissa", "Rochinha", "Magnaghi"] },
+      {
+        id: "group-sr-mignon",
+        name: "SR. Mignon",
+        payerName: "SR. Mignon",
+        inheritRules: true,
+        units: [
+          "Sr. Mignon Sede Nova",
+          "Sr. Mignon Astronautas",
+          "Prolind",
+          "BCA",
+          "Sr. Mignon Chácaras",
+          "Safran",
+          "Fantástico",
+          "Globo Jambeiro",
+          "Adatex Filial",
+          "Adatex Matriz",
+          "Vetcia",
+          "Sany",
+          "Cherry",
+          "NHJ",
+          "Premovale",
+          "Legado Usimagem",
+          "Armavale",
+          "Larissa",
+          "Rochinha",
+          "Magnaghi",
+        ],
+      },
     ],
     holidays: [
-      { date: "2026-09-07", name: "Independência do Brasil", type: "Nacional", driverRule: "Base de domingo" },
-      { date: "2026-11-19", name: "Aniversário de São José dos Campos", type: "Municipal", driverRule: "Antecipar publicação" },
+      {
+        date: "2026-09-07",
+        name: "Independência do Brasil",
+        type: "Nacional",
+        driverRule: "Base de domingo",
+      },
+      {
+        date: "2026-11-19",
+        name: "Aniversário de São José dos Campos",
+        type: "Municipal",
+        driverRule: "Antecipar publicação",
+      },
     ],
     customFields: [
       { entity: "Cliente", label: "Setor", type: "Texto", required: false },
@@ -290,10 +1423,30 @@ export const seedState: AppState = {
     ],
   },
   audit: [
-    { at: "2026-08-26T09:15", user: "Natanael", action: "Registrou cobrança da NF 38190" },
-    { at: "2026-08-26T08:30", user: "Sistema", action: "Gerou tarefas recorrentes de quarta-feira" },
-    { at: "2026-08-25T18:02", user: "Willians", action: "Atualizou base de rotas do fim de semana" },
+    {
+      at: "2026-08-26T09:15",
+      user: "Natanael",
+      action: "Registrou cobrança da NF 38190",
+    },
+    {
+      at: "2026-08-26T08:30",
+      user: "Sistema",
+      action: "Gerou tarefas recorrentes de quarta-feira",
+    },
+    {
+      at: "2026-08-25T18:02",
+      user: "Willians",
+      action: "Atualizou base de rotas do fim de semana",
+    },
   ],
 };
 
-export const dayNames = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
+export const dayNames = [
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+  "Domingo",
+];

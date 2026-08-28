@@ -1,10 +1,20 @@
-import { AppState, Client, ClosingRule, DueRule, Emission, Priority, seedState } from "@/app/lib/seed";
+import {
+  AppState,
+  Client,
+  ClosingRule,
+  DueRule,
+  Emission,
+  Priority,
+  seedState,
+} from "@/app/lib/seed";
 
 const DAY_MS = 86_400_000;
 
 export function isoToday() {
   const now = new Date();
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())).toISOString().slice(0, 10);
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
+    .toISOString()
+    .slice(0, 10);
 }
 
 function dateFromIso(value: string) {
@@ -37,10 +47,17 @@ export function calculateDueDate(issueDate: string, rule?: DueRule) {
   if (rule.mode === "fortnight_window") {
     const date = dateFromIso(issueDate);
     if (date.getUTCDate() <= 15) {
-      const day = Math.min(30, monthLastDay(date.getUTCFullYear(), date.getUTCMonth()));
-      return iso(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), day)));
+      const day = Math.min(
+        30,
+        monthLastDay(date.getUTCFullYear(), date.getUTCMonth()),
+      );
+      return iso(
+        new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), day)),
+      );
     }
-    return iso(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 15)));
+    return iso(
+      new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 15)),
+    );
   }
   const base = dateFromIso(addDays(issueDate, rule.days));
   const paymentDays = [...rule.paymentDays].sort((a, b) => a - b);
@@ -50,8 +67,13 @@ export function calculateDueDate(issueDate: string, rule?: DueRule) {
     const candidateYear = year + Math.floor(month / 12);
     const candidateMonth = month % 12;
     for (const day of paymentDays) {
-      const validDay = Math.min(day, monthLastDay(candidateYear, candidateMonth));
-      const candidate = new Date(Date.UTC(candidateYear, candidateMonth, validDay));
+      const validDay = Math.min(
+        day,
+        monthLastDay(candidateYear, candidateMonth),
+      );
+      const candidate = new Date(
+        Date.UTC(candidateYear, candidateMonth, validDay),
+      );
       if (candidate >= base) return iso(candidate);
     }
   }
@@ -61,14 +83,24 @@ export function calculateDueDate(issueDate: string, rule?: DueRule) {
 export function datesForRule(year: number, month: number, rule: ClosingRule) {
   const dates: string[] = [];
   const last = monthLastDay(year, month);
-  if (rule.frequency === "month_end_next_day") return [iso(new Date(Date.UTC(year, month + 1, 1)))];
-  if (rule.frequency === "fortnightly") return [iso(new Date(Date.UTC(year, month, 15))), iso(new Date(Date.UTC(year, month, last)))];
+  if (rule.frequency === "month_end_next_day")
+    return [iso(new Date(Date.UTC(year, month + 1, 1)))];
+  if (rule.frequency === "fortnightly")
+    return [
+      iso(new Date(Date.UTC(year, month, 15))),
+      iso(new Date(Date.UTC(year, month, last))),
+    ];
   if (rule.frequency === "fixed_days") {
-    return [...new Set(rule.daysOfMonth)].sort((a, b) => a - b).map(day => iso(new Date(Date.UTC(year, month, Math.min(Math.max(day, 1), last)))));
+    return [...new Set(rule.daysOfMonth)]
+      .sort((a, b) => a - b)
+      .map((day) =>
+        iso(new Date(Date.UTC(year, month, Math.min(Math.max(day, 1), last)))),
+      );
   }
   for (let day = 1; day <= last; day++) {
     const date = new Date(Date.UTC(year, month, day));
-    if (rule.frequency === "daily" || rule.weekdays.includes(date.getUTCDay())) dates.push(iso(date));
+    if (rule.frequency === "daily" || rule.weekdays.includes(date.getUTCDay()))
+      dates.push(iso(date));
   }
   return dates;
 }
@@ -82,7 +114,9 @@ function legacyClosingId(value = "") {
   if (name.includes("25")) return "closing-day-25";
   if (name.includes("20")) return "closing-day-20";
   if (name.includes("mensal")) return "closing-month-end";
-  return name.includes("diár") || name.includes("diar") ? "closing-daily" : "closing-day-25";
+  return name.includes("diár") || name.includes("diar")
+    ? "closing-daily"
+    : "closing-day-25";
 }
 
 function legacyDueId(value = "") {
@@ -96,7 +130,11 @@ function legacyDueId(value = "") {
 }
 
 function legacyColorId(priority: Priority) {
-  return priority === "Vermelho" ? "color-red" : priority === "Amarelo" ? "color-yellow" : "color-green";
+  return priority === "Vermelho"
+    ? "color-red"
+    : priority === "Amarelo"
+      ? "color-yellow"
+      : "color-green";
 }
 
 function migrateClient(client: Partial<Client>): Client {
@@ -110,69 +148,178 @@ function migrateClient(client: Partial<Client>): Client {
     email: client.email || "",
     whatsapp: client.whatsapp || "",
     company: client.company || seedState.settings.companies[0].name,
-    closing: client.closing || seedState.settings.closingRules.find(rule => rule.id === closingRuleId)?.name || "Diário",
+    closing:
+      client.closing ||
+      seedState.settings.closingRules.find((rule) => rule.id === closingRuleId)
+        ?.name ||
+      "Diário",
     closingRuleId,
-    dueRule: client.dueRule || seedState.settings.dueRules.find(rule => rule.id === dueRuleId)?.name || "30 dias",
+    dueRule:
+      client.dueRule ||
+      seedState.settings.dueRules.find((rule) => rule.id === dueRuleId)?.name ||
+      "30 dias",
     dueRuleId,
     priority,
     colorRuleId: client.colorRuleId || legacyColorId(priority),
     groupId: client.groupId || "",
-    requiresOrderCheck: client.requiresOrderCheck ?? closingRuleId === "closing-daily-check",
+    requiresOrderCheck:
+      client.requiresOrderCheck ?? closingRuleId === "closing-daily-check",
     payment: client.payment || "Boleto",
     sending: client.sending || "E-mail",
     issuer: client.issuer || "Yerardo",
     collectors: client.collectors?.length ? client.collectors : ["Natanael"],
     billing: client.billing || "Nota Fiscal",
     reminders: client.reminders ?? true,
-    cancellationDays: client.cancellationDays ?? (priority === "Vermelho" ? 1 : 5),
+    cancellationDays:
+      client.cancellationDays ?? (priority === "Vermelho" ? 1 : 5),
     active: client.active ?? true,
     tags: client.tags || [],
     notes: client.notes || "",
   };
 }
 
-export function normalizeFinancialState(raw: Partial<AppState> | null | undefined): AppState {
+export function normalizeFinancialState(
+  raw: Partial<AppState> | null | undefined,
+): AppState {
   const source = raw || seedState;
+  const sourceUsers = source.settings?.users || [];
+  const sourceProfiles = source.settings?.profiles || [];
   const settings = {
     ...structuredClone(seedState.settings),
     ...(source.settings || {}),
-    closingRules: source.settings?.closingRules?.length ? source.settings.closingRules : structuredClone(seedState.settings.closingRules),
-    dueRules: source.settings?.dueRules?.length && "id" in source.settings.dueRules[0] ? source.settings.dueRules : structuredClone(seedState.settings.dueRules),
-    colorRules: source.settings?.colorRules?.length && "id" in source.settings.colorRules[0] ? source.settings.colorRules : structuredClone(seedState.settings.colorRules),
-    customerGroups: source.settings?.customerGroups?.length ? source.settings.customerGroups : structuredClone(seedState.settings.customerGroups),
+    companies: (source.settings?.companies?.length
+      ? source.settings.companies
+      : seedState.settings.companies
+    ).map((company, index) => ({
+      ...structuredClone(
+        seedState.settings.companies[index] || seedState.settings.companies[0],
+      ),
+      ...company,
+    })),
+    closingRules: source.settings?.closingRules?.length
+      ? source.settings.closingRules
+      : structuredClone(seedState.settings.closingRules),
+    dueRules:
+      source.settings?.dueRules?.length && "id" in source.settings.dueRules[0]
+        ? source.settings.dueRules
+        : structuredClone(seedState.settings.dueRules),
+    colorRules:
+      source.settings?.colorRules?.length &&
+      "id" in source.settings.colorRules[0]
+        ? source.settings.colorRules
+        : structuredClone(seedState.settings.colorRules),
+    customerGroups: source.settings?.customerGroups?.length
+      ? source.settings.customerGroups
+      : structuredClone(seedState.settings.customerGroups),
+    appearance: {
+      ...structuredClone(seedState.settings.appearance),
+      ...(source.settings?.appearance || {}),
+    },
+    documentTemplates: source.settings?.documentTemplates?.length
+      ? source.settings.documentTemplates
+      : structuredClone(seedState.settings.documentTemplates),
+    modules: source.settings?.modules?.length
+      ? source.settings.modules
+      : structuredClone(seedState.settings.modules),
+    profiles: sourceProfiles.length
+      ? sourceProfiles.map((profile, index) => {
+          const fallback =
+            seedState.settings.profiles.find(
+              (item) => item.name === profile.name,
+            ) ||
+            seedState.settings.profiles[index] ||
+            seedState.settings.profiles[0];
+          return {
+            ...structuredClone(fallback),
+            ...profile,
+            id: profile.id || fallback.id,
+            description: profile.description || fallback.description,
+            moduleAccess:
+              profile.moduleAccess || structuredClone(fallback.moduleAccess),
+          };
+        })
+      : structuredClone(seedState.settings.profiles),
+    users: sourceUsers.length
+      ? sourceUsers.map((account, index) => {
+          const fallback =
+            seedState.settings.users.find(
+              (item) => item.email === account.email,
+            ) ||
+            seedState.settings.users[index] ||
+            seedState.settings.users[0];
+          const profile = (
+            sourceProfiles.length ? sourceProfiles : seedState.settings.profiles
+          ).find((item) => item.name === account.role);
+          return {
+            ...structuredClone(fallback),
+            ...account,
+            id: account.id || fallback.id || `usuario-${index}`,
+            profileId: account.profileId || profile?.id || fallback.profileId,
+            companies: account.companies?.length ? account.companies : ["*"],
+          };
+        })
+      : structuredClone(seedState.settings.users),
   };
-  const clients = (source.clients?.length ? source.clients : seedState.clients).map(migrateClient);
+  const clients = (
+    source.clients?.length ? source.clients : seedState.clients
+  ).map(migrateClient);
   const next: AppState = {
     ...structuredClone(seedState),
     ...source,
     settings,
     clients,
-    emissions: (source.emissions || []).map(emission => ({
+    emissions: (source.emissions || []).map((emission) => ({
       ...emission,
-      orderCheck: emission.orderCheck || (clients.find(client => client.id === emission.clientId)?.requiresOrderCheck ? "A verificar" : "Não necessário"),
+      orderCheck:
+        emission.orderCheck ||
+        (clients.find((client) => client.id === emission.clientId)
+          ?.requiresOrderCheck
+          ? "A verificar"
+          : "Não necessário"),
       autoGenerated: emission.autoGenerated ?? false,
     })),
-    collections: (source.collections || []).map(collection => ({
+    collections: (source.collections || []).map((collection) => ({
       ...collection,
       availableFrom: collection.availableFrom || addDays(collection.dueDate, 1),
-      policyId: collection.policyId || clients.find(client => client.id === collection.clientId)?.colorRuleId || legacyColorId(collection.priority),
+      policyId:
+        collection.policyId ||
+        clients.find((client) => client.id === collection.clientId)
+          ?.colorRuleId ||
+        legacyColorId(collection.priority),
     })),
   };
   return ensureFinancialSchedule(next);
 }
 
-export function ensureFinancialSchedule(state: AppState, reference = isoToday()) {
+export function ensureFinancialSchedule(
+  state: AppState,
+  reference = isoToday(),
+) {
   const next = structuredClone(state);
   const base = dateFromIso(reference);
   const months = [0, 1];
-  const keys = new Set(next.emissions.map(emission => `${emission.clientId}|${emission.scheduledDate}`));
-  for (const client of next.clients.filter(item => item.active)) {
-    const closingRule = next.settings.closingRules.find(rule => rule.id === client.closingRuleId && rule.active);
-    const dueRule = next.settings.dueRules.find(rule => rule.id === client.dueRuleId && rule.active);
+  const keys = new Set(
+    next.emissions.map(
+      (emission) => `${emission.clientId}|${emission.scheduledDate}`,
+    ),
+  );
+  for (const client of next.clients.filter((item) => item.active)) {
+    const closingRule = next.settings.closingRules.find(
+      (rule) => rule.id === client.closingRuleId && rule.active,
+    );
+    const dueRule = next.settings.dueRules.find(
+      (rule) => rule.id === client.dueRuleId && rule.active,
+    );
     if (!closingRule) continue;
     for (const offset of months) {
-      const monthDate = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + offset, 1));
-      for (const scheduledDate of datesForRule(monthDate.getUTCFullYear(), monthDate.getUTCMonth(), closingRule)) {
+      const monthDate = new Date(
+        Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + offset, 1),
+      );
+      for (const scheduledDate of datesForRule(
+        monthDate.getUTCFullYear(),
+        monthDate.getUTCMonth(),
+        closingRule,
+      )) {
         const key = `${client.id}|${scheduledDate}`;
         if (keys.has(key)) continue;
         const emission: Emission = {
@@ -187,9 +334,15 @@ export function ensureFinancialSchedule(state: AppState, reference = isoToday())
           status: "Pendente",
           invoiceNumbers: [],
           dueDate: calculateDueDate(scheduledDate, dueRule),
-          observation: closingRule.requiresOrderCheck || client.requiresOrderCheck ? "Verificar no sistema se existe pedido antes de emitir." : "",
+          observation:
+            closingRule.requiresOrderCheck || client.requiresOrderCheck
+              ? "Verificar no sistema se existe pedido antes de emitir."
+              : "",
           amount: 0,
-          orderCheck: closingRule.requiresOrderCheck || client.requiresOrderCheck ? "A verificar" : "Não necessário",
+          orderCheck:
+            closingRule.requiresOrderCheck || client.requiresOrderCheck
+              ? "A verificar"
+              : "Não necessário",
           autoGenerated: true,
         };
         next.emissions.push(emission);
@@ -197,27 +350,85 @@ export function ensureFinancialSchedule(state: AppState, reference = isoToday())
       }
     }
   }
-  next.emissions.sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || a.clientId.localeCompare(b.clientId));
+  next.emissions.sort(
+    (a, b) =>
+      a.scheduledDate.localeCompare(b.scheduledDate) ||
+      a.clientId.localeCompare(b.clientId),
+  );
   return next;
 }
 
-export function openPendingCount(state: AppState, clientId: string, reference = isoToday()) {
-  return state.collections.filter(item => item.clientId === clientId && item.dueDate < reference && !["Paga", "Baixada", "Arquivada"].includes(item.status)).length;
+export function openPendingCount(
+  state: AppState,
+  clientId: string,
+  reference = isoToday(),
+) {
+  return state.collections.filter(
+    (item) =>
+      item.clientId === clientId &&
+      item.dueDate < reference &&
+      !["Paga", "Baixada", "Arquivada"].includes(item.status),
+  ).length;
 }
 
-export function collectionGuidance(state: AppState, clientId: string, reference = isoToday()) {
-  const client = state.clients.find(item => item.id === clientId);
-  const policy = state.settings.colorRules.find(item => item.id === client?.colorRuleId);
+export function collectionGuidance(
+  state: AppState,
+  clientId: string,
+  reference = isoToday(),
+) {
+  const client = state.clients.find((item) => item.id === clientId);
+  const policy = state.settings.colorRules.find(
+    (item) => item.id === client?.colorRuleId,
+  );
   const open = openPendingCount(state, clientId, reference);
-  if (!policy) return { open, label: "Regra não definida", tone: "neutral", policy: undefined };
-  if (policy.maxOpenPending === null) return { open, label: "Cobrar normalmente · fornecimento mantido", tone: "success", policy };
-  if (policy.maxOpenPending === 0 && open > 0) return { open, label: "Cobrança imediata · encaminhar cancelamento se não pagar", tone: "danger", policy };
-  if (open >= policy.maxOpenPending) return { open, label: `Limite de ${policy.maxOpenPending} pendências atingido`, tone: "warning", policy };
-  return { open, label: `${open} de ${policy.maxOpenPending} pendências permitidas`, tone: "warning", policy };
+  if (!policy)
+    return {
+      open,
+      label: "Regra não definida",
+      tone: "neutral",
+      policy: undefined,
+    };
+  if (policy.maxOpenPending === null)
+    return {
+      open,
+      label: "Cobrar normalmente · fornecimento mantido",
+      tone: "success",
+      policy,
+    };
+  if (policy.maxOpenPending === 0 && open > 0)
+    return {
+      open,
+      label: "Cobrança imediata · encaminhar cancelamento se não pagar",
+      tone: "danger",
+      policy,
+    };
+  if (open >= policy.maxOpenPending)
+    return {
+      open,
+      label: `Limite de ${policy.maxOpenPending} pendências atingido`,
+      tone: "warning",
+      policy,
+    };
+  return {
+    open,
+    label: `${open} de ${policy.maxOpenPending} pendências permitidas`,
+    tone: "warning",
+    policy,
+  };
 }
 
-export const weekdayLabels = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+export const weekdayLabels = [
+  "Domingo",
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+];
 
 export function daysBetween(from: string, to: string) {
-  return Math.floor((dateFromIso(to).getTime() - dateFromIso(from).getTime()) / DAY_MS);
+  return Math.floor(
+    (dateFromIso(to).getTime() - dateFromIso(from).getTime()) / DAY_MS,
+  );
 }
