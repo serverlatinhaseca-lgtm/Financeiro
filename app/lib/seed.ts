@@ -8,6 +8,7 @@ export type ModuleId =
   | "financeiro"
   | "cobrancas"
   | "tarefas"
+  | "operacional"
   | "rotas"
   | "documentos"
   | "recados"
@@ -70,6 +71,7 @@ export type CustomerGroup = {
   payerName: string;
   units: string[];
   inheritRules: boolean;
+  payerClientId?: string;
 };
 
 export type Client = {
@@ -97,6 +99,13 @@ export type Client = {
   active: boolean;
   tags: string[];
   notes: string;
+  legalName?: string;
+  stateRegistration?: string;
+  cep?: string;
+  address?: string;
+  priceTable?: string;
+  score?: number;
+  requiresManifest?: boolean;
 };
 
 export type Emission = {
@@ -174,6 +183,108 @@ export type RouteRecord = {
   rule: "fixo" | "programado" | "sob-demanda";
   registered: boolean;
   checked: boolean;
+  routeName?: string;
+  point?: string;
+  address?: string;
+  order?: number;
+  shift?: string;
+  trip?: string;
+  competency?: string;
+  deliveryDate?: string;
+  registrationStatus?: string;
+  conferenceStatus?: string;
+  alert?: string;
+  product?: string;
+  quantity?: number;
+};
+
+export type RouteDriver = {
+  id: string;
+  name: string;
+  shortName: string;
+  status: string;
+  phone: string;
+  company: string;
+  availability: string;
+  shifts: string[];
+  days: string[];
+  linkedRoutes: string[];
+  substituteId: string;
+  notes: string;
+};
+
+export type RoutePlan = {
+  id: string;
+  name: string;
+  code: string;
+  status: string;
+  type: string;
+  days: string[];
+  driverId: string;
+  substituteId: string;
+  shift: string;
+  trips: string[];
+  departure: string;
+  departurePoint: string;
+  returnTime: string;
+  validityStart: string;
+  validityEnd: string;
+  permanent: boolean;
+  notes: string;
+};
+
+export type RouteCompetency = {
+  id: string;
+  label: string;
+  month: number;
+  year: number;
+  status: string;
+  preparation: number;
+  confirmations: number;
+  registration: number;
+  conference: number;
+  correction: number;
+  publication: number;
+  version: number;
+  official: boolean;
+};
+
+export type OperationalHoliday = {
+  id: string;
+  name: string;
+  date: string;
+  annual: boolean;
+  type: string;
+  locality: string;
+  status: string;
+  routeBase: string;
+  operationalRule: string;
+  notifications: number[];
+  notes: string;
+};
+
+export type RouteDivergence = {
+  id: string;
+  routeId: string;
+  client: string;
+  date: string;
+  type: string;
+  expected: string;
+  found: string;
+  description: string;
+  responsible: string;
+  priority: string;
+  status: string;
+};
+
+export type RouteVersion = {
+  id: string;
+  competencyId: string;
+  version: number;
+  createdAt: string;
+  createdBy: string;
+  official: boolean;
+  summary: string;
 };
 
 export type GeneratedDocument = {
@@ -206,6 +317,8 @@ export type UserAccount = {
   profileId: string;
   active: boolean;
   companies: string[];
+  username?: string;
+  localPassword?: string;
 };
 
 export type PermissionProfile = {
@@ -238,6 +351,12 @@ export type AppearanceSettings = {
   logo: string;
   loginBackground: string;
   thumbnail: string;
+  favicon: string;
+  darkPrimary: string;
+  darkSecondary: string;
+  darkBackground: string;
+  darkSurface: string;
+  darkText: string;
 };
 
 export type DocumentTemplate = {
@@ -284,6 +403,13 @@ export type Settings = {
     type: string;
     required: boolean;
   }[];
+  priceTables: string[];
+  routeStatuses: string[];
+  driverStatuses: string[];
+  holidayTypes: string[];
+  competencyStatuses: string[];
+  routePreparationDays: number;
+  allowSelfVerification: boolean;
 };
 
 export type AppState = {
@@ -292,6 +418,12 @@ export type AppState = {
   collections: Collection[];
   tasks: Task[];
   routes: RouteRecord[];
+  routePlans: RoutePlan[];
+  routeDrivers: RouteDriver[];
+  routeCompetencies: RouteCompetency[];
+  routeHolidays: OperationalHoliday[];
+  routeDivergences: RouteDivergence[];
+  routeVersions: RouteVersion[];
   documents: GeneratedDocument[];
   notices: Notice[];
   settings: Settings;
@@ -328,6 +460,13 @@ export const seedState: AppState = {
       tags: ["educação", "grande"],
       notes:
         "Verificar no sistema de pedidos antes da emissão. Se não houver pedido, marcar Sem pedido.",
+      legalName: "Serviço Social da Indústria - SESI",
+      stateRegistration: "Isento",
+      cep: "12200-000",
+      address: "São José dos Campos - SP",
+      priceTable: "TABELA EMPRESAS (E)",
+      score: 742,
+      requiresManifest: true,
     },
     {
       id: "c2",
@@ -741,6 +880,177 @@ export const seedState: AppState = {
     },
   ],
   routes: routeData.records as RouteRecord[],
+  routePlans: [
+    {
+      id: "route-norte",
+      name: "Rota Norte",
+      code: "RT-NOR-01",
+      status: "Ativa",
+      type: "Semana",
+      days: ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"],
+      driverId: "driver-adeir",
+      substituteId: "driver-valdir",
+      shift: "Manhã",
+      trips: ["1ª Viagem", "2ª Viagem"],
+      departure: "05:30",
+      departurePoint: "Panificadora",
+      returnTime: "11:30",
+      validityStart: "2026-09-01",
+      validityEnd: "",
+      permanent: true,
+      notes: "Base oficial de dias úteis.",
+    },
+    {
+      id: "route-centro",
+      name: "Rota Centro",
+      code: "RT-CEN-01",
+      status: "Em revisão",
+      type: "Semana",
+      days: ["Segunda", "Quarta", "Sexta"],
+      driverId: "driver-valdir",
+      substituteId: "",
+      shift: "Manhã",
+      trips: ["1ª Viagem"],
+      departure: "06:00",
+      departurePoint: "Panificadora",
+      returnTime: "10:30",
+      validityStart: "2026-09-01",
+      validityEnd: "",
+      permanent: true,
+      notes: "Revisar sequência antes da publicação.",
+    },
+    {
+      id: "route-feriado",
+      name: "Rota Feriado 07/09/2026",
+      code: "RT-FER-0709",
+      status: "Especial de feriado",
+      type: "Feriado",
+      days: ["Segunda"],
+      driverId: "driver-adeir",
+      substituteId: "",
+      shift: "Manhã",
+      trips: ["1ª Viagem"],
+      departure: "06:30",
+      departurePoint: "Panificadora",
+      returnTime: "11:00",
+      validityStart: "2026-09-07",
+      validityEnd: "2026-09-07",
+      permanent: false,
+      notes: "Cópia independente baseada no domingo.",
+    },
+  ],
+  routeDrivers: [
+    {
+      id: "driver-adeir",
+      name: "Adeir dos Santos",
+      shortName: "Adeir",
+      status: "Ativo",
+      phone: "(12) 99999-0101",
+      company: "Nova Esperança",
+      availability: "05:00 às 15:00",
+      shifts: ["Manhã"],
+      days: ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"],
+      linkedRoutes: ["route-norte", "route-feriado"],
+      substituteId: "driver-valdir",
+      notes: "Motorista padrão da Rota Norte.",
+    },
+    {
+      id: "driver-valdir",
+      name: "Valdir Pereira",
+      shortName: "Valdir",
+      status: "Ativo",
+      phone: "(12) 99999-0202",
+      company: "Nova Esperança",
+      availability: "05:30 às 16:00",
+      shifts: ["Manhã", "Tarde"],
+      days: ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Domingo"],
+      linkedRoutes: ["route-centro"],
+      substituteId: "",
+      notes: "Substituto autorizado para a Rota Norte.",
+    },
+  ],
+  routeCompetencies: [
+    {
+      id: "competency-2026-09",
+      label: "Setembro/2026",
+      month: 9,
+      year: 2026,
+      status: "Em cadastro",
+      preparation: 100,
+      confirmations: 92,
+      registration: 82,
+      conference: 76,
+      correction: 67,
+      publication: 40,
+      version: 2,
+      official: true,
+    },
+    {
+      id: "competency-2026-08",
+      label: "Agosto/2026",
+      month: 8,
+      year: 2026,
+      status: "Arquivada",
+      preparation: 100,
+      confirmations: 100,
+      registration: 100,
+      conference: 100,
+      correction: 100,
+      publication: 100,
+      version: 3,
+      official: false,
+    },
+  ],
+  routeHolidays: [
+    {
+      id: "holiday-0709",
+      name: "Independência do Brasil",
+      date: "2026-09-07",
+      annual: true,
+      type: "Nacional",
+      locality: "Brasil",
+      status: "Em preparação",
+      routeBase: "Domingo",
+      operationalRule: "Antecipar análise e confirmar clientes",
+      notifications: [30, 15, 7, 3, 1],
+      notes: "Quatro clientes aguardando confirmação.",
+    },
+  ],
+  routeDivergences: [
+    {
+      id: "div-1",
+      routeId: "route-norte",
+      client: "Cliente ABC",
+      date: "2026-09-01",
+      type: "Quantidade",
+      expected: "150 unidades",
+      found: "120 unidades",
+      description: "Faltam 30 unidades no sistema externo.",
+      responsible: "Cadastro",
+      priority: "Alta",
+      status: "Aberta",
+    },
+  ],
+  routeVersions: [
+    {
+      id: "version-sep-2",
+      competencyId: "competency-2026-09",
+      version: 2,
+      createdAt: "2026-08-30T16:42:00.000Z",
+      createdBy: "Administrador",
+      official: true,
+      summary: "Motoristas, horários e feriado 07/09 revisados.",
+    },
+    {
+      id: "version-sep-1",
+      competencyId: "competency-2026-09",
+      version: 1,
+      createdAt: "2026-08-28T14:20:00.000Z",
+      createdBy: "Administrador",
+      official: false,
+      summary: "Versão inicial copiada de agosto.",
+    },
+  ],
   documents: [
     {
       id: "d1",
@@ -838,6 +1148,8 @@ export const seedState: AppState = {
         profileId: "profile-admin",
         active: true,
         companies: ["*"],
+        username: "admin",
+        localPassword: "Admin@123",
       },
       {
         id: "u-yerardo",
@@ -847,6 +1159,8 @@ export const seedState: AppState = {
         profileId: "profile-financeiro",
         active: true,
         companies: ["*"],
+        username: "yerardo",
+        localPassword: "Acesso@123",
       },
       {
         id: "u-natanael",
@@ -856,6 +1170,8 @@ export const seedState: AppState = {
         profileId: "profile-cobrancas",
         active: true,
         companies: ["*"],
+        username: "natanael",
+        localPassword: "Acesso@123",
       },
       {
         id: "u-willians",
@@ -865,6 +1181,8 @@ export const seedState: AppState = {
         profileId: "profile-operacoes",
         active: true,
         companies: ["*"],
+        username: "willians",
+        localPassword: "Acesso@123",
       },
       {
         id: "u-jessica",
@@ -874,6 +1192,8 @@ export const seedState: AppState = {
         profileId: "profile-diretoria",
         active: true,
         companies: ["*"],
+        username: "jessica",
+        localPassword: "Acesso@123",
       },
       {
         id: "u-marcelo",
@@ -883,6 +1203,8 @@ export const seedState: AppState = {
         profileId: "profile-diretoria",
         active: true,
         companies: ["*"],
+        username: "marcelo",
+        localPassword: "Acesso@123",
       },
     ],
     profiles: [
@@ -919,6 +1241,15 @@ export const seedState: AppState = {
             "editar",
             "excluir",
             "aprovar",
+            "configurar",
+          ],
+          operacional: [
+            "visualizar",
+            "criar",
+            "editar",
+            "excluir",
+            "aprovar",
+            "exportar",
             "configurar",
           ],
           rotas: [
@@ -1006,6 +1337,7 @@ export const seedState: AppState = {
           clientes: ["visualizar"],
           cobrancas: ["visualizar", "editar"],
           tarefas: ["visualizar", "criar", "editar"],
+          operacional: ["visualizar", "criar", "editar", "configurar"],
           rotas: ["visualizar", "criar", "editar", "aprovar"],
           documentos: ["visualizar", "criar", "exportar"],
           recados: ["visualizar", "criar"],
@@ -1028,6 +1360,7 @@ export const seedState: AppState = {
           financeiro: ["visualizar"],
           cobrancas: ["visualizar", "aprovar"],
           tarefas: ["visualizar"],
+          operacional: ["visualizar"],
           rotas: ["visualizar"],
           documentos: ["visualizar"],
           recados: ["visualizar", "criar"],
@@ -1072,22 +1405,48 @@ export const seedState: AppState = {
       },
       {
         id: "tarefas",
-        name: "Tarefas",
-        description: "Checklist, recorrências e planner da equipe.",
+        name: "Tarefas da equipe",
+        description: "Tarefas por perfil, recorrências e planner da equipe.",
         enabled: true,
         tabs: ["Meu dia", "Planner", "Catálogo", "Recorrências", "Indicadores"],
       },
       {
-        id: "rotas",
-        name: "Base de rotas",
-        description: "Base oficial para cadastro no sistema de pedidos.",
+        id: "operacional",
+        name: "Operacional",
+        description:
+          "Calculadoras de produção e ferramentas práticas da operação.",
         enabled: true,
         tabs: [
-          "Cadastrar hoje",
-          "Bases mensais",
+          "Calculadora de produção",
+          "Categorias",
+          "Produtos",
+          "Histórico",
+        ],
+      },
+      {
+        id: "rotas",
+        name: "Planejamento de rotas",
+        description:
+          "Central mensal de rotas, motoristas, feriados, cadastro e conferência.",
+        enabled: true,
+        tabs: [
+          "Visão Geral",
+          "Planner",
+          "Base Mensal",
+          "Consulta para Cadastro",
+          "Próximo Mês",
+          "Rotas",
+          "Mapa",
+          "Clientes e Paradas",
+          "Motoristas",
           "Regras",
-          "Divergências",
+          "Feriados",
+          "Conferência",
+          "Pendências",
+          "Histórico e Versões",
           "Indicadores",
+          "Relatórios",
+          "Configurações",
         ],
       },
       {
@@ -1140,6 +1499,12 @@ export const seedState: AppState = {
       logo: "/brand/nova-esperanca.jpg",
       loginBackground: "",
       thumbnail: "/brand/nova-esperanca.jpg",
+      favicon: "/brand/nova-esperanca.jpg",
+      darkPrimary: "#e98942",
+      darkSecondary: "#8fb8da",
+      darkBackground: "#0f1720",
+      darkSurface: "#18232e",
+      darkText: "#edf3f7",
     },
     documentTemplates: [
       {
@@ -1421,6 +1786,49 @@ export const seedState: AppState = {
       { entity: "Cliente", label: "Setor", type: "Texto", required: false },
       { entity: "Rota", label: "Viagem", type: "Seleção", required: true },
     ],
+    priceTables: [
+      "TABELA EMPRESAS (E)",
+      "TABELA HOSPITAIS (H)",
+      "TABELA MERENDAS (M)",
+    ],
+    routeStatuses: [
+      "Ativa",
+      "Em revisão",
+      "Temporária",
+      "Suspensa",
+      "Arquivada",
+      "Especial de feriado",
+    ],
+    driverStatuses: [
+      "Ativo",
+      "Inativo",
+      "Férias",
+      "Afastado",
+      "Indisponível",
+      "Temporário",
+      "Substituto",
+    ],
+    holidayTypes: ["Nacional", "Estadual", "Regional", "Municipal"],
+    competencyStatuses: [
+      "Não iniciada",
+      "Criada",
+      "Em preparação",
+      "Aguardando confirmação",
+      "Em revisão",
+      "Em cadastro",
+      "Parcialmente cadastrada",
+      "Cadastro concluído",
+      "Em conferência",
+      "Com divergências",
+      "Corrigida",
+      "Verificada",
+      "Publicada",
+      "Reaberta",
+      "Finalizada",
+      "Arquivada",
+    ],
+    routePreparationDays: 6,
+    allowSelfVerification: false,
   },
   audit: [
     {

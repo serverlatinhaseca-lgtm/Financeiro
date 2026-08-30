@@ -26,6 +26,7 @@ import {
   LogOut,
   Menu,
   MessageSquareText,
+  Moon,
   PackageCheck,
   Pencil,
   Plus,
@@ -37,6 +38,7 @@ import {
   Search,
   Settings,
   ShieldCheck,
+  Sun,
   Trash2,
   TriangleAlert,
   Upload,
@@ -46,6 +48,21 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Bar,
+  BarChart,
+  Cell,
+  Pie,
+  PieChart,
+  PolarAngleAxis,
+  PolarGrid,
+  Radar,
+  RadarChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   AppState,
   Client,
@@ -69,6 +86,7 @@ import {
 } from "@/app/lib/finance-rules";
 import { FinancialRuleSettings } from "@/app/components/financial-rules";
 import { AdminCenter } from "@/app/components/admin-center";
+import { RouteOperationsCenter } from "@/app/components/route-operations-center";
 import {
   PlannerCalendar,
   PlannerEvent,
@@ -149,8 +167,9 @@ const nav: { id: View; label: string; icon: typeof Gauge }[] = [
   { id: "clientes", label: "Clientes", icon: UsersRound },
   { id: "financeiro", label: "Financeiro", icon: ReceiptText },
   { id: "cobrancas", label: "Cobranças", icon: WalletCards },
-  { id: "tarefas", label: "Tarefas", icon: ListChecks },
-  { id: "rotas", label: "Base de rotas", icon: Route },
+  { id: "tarefas", label: "Tarefas da equipe", icon: ListChecks },
+  { id: "operacional", label: "Operacional", icon: PackageCheck },
+  { id: "rotas", label: "Planejamento de rotas", icon: Route },
   { id: "documentos", label: "Documentos", icon: FileText },
   { id: "recados", label: "Recados", icon: MessageSquareText },
   { id: "relatorios", label: "Relatórios", icon: Activity },
@@ -281,7 +300,7 @@ function Login({
   onSuccess: (user: SessionUser, token: string) => void;
   state: AppState;
 }) {
-  const [email, setEmail] = useState("admin@gestao.local"),
+  const [username, setUsername] = useState("admin"),
     [password, setPassword] = useState("Admin@123"),
     [busy, setBusy] = useState(false);
   async function submit(event: FormEvent) {
@@ -291,14 +310,14 @@ function Login({
       const r = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ username, password }),
       });
       if (r.ok) {
         const data = await r.json();
         onSuccess(
           {
             name: data.user?.name ?? "Administrador",
-            email: data.user?.email ?? email,
+            email: data.user?.email ?? `${username}@gestao.local`,
             role: data.user?.role ?? "Administrador",
           },
           data.token,
@@ -307,9 +326,19 @@ function Login({
         return;
       }
     } catch {}
-    if (email === "admin@gestao.local" && password === "Admin@123") {
+    const localAccount = state.settings.users.find(
+      (account) =>
+        account.active &&
+        account.username?.toLowerCase() === username.toLowerCase() &&
+        account.localPassword === password,
+    );
+    if (localAccount) {
       onSuccess(
-        { name: "Administrador", email, role: "Administrador" },
+        {
+          name: localAccount.name,
+          email: localAccount.email,
+          role: localAccount.role,
+        },
         "local-demo",
       );
       toast.success("Modo local iniciado");
@@ -345,11 +374,6 @@ function Login({
             <CheckCircle2 /> Identidade, regras e campos editáveis
           </span>
         </div>
-        <div className="brand-pair">
-          {state.settings.companies.map((company) => (
-            <img src={company.logo} alt={company.name} key={company.name} />
-          ))}
-        </div>
       </section>
       <section className="login-panel">
         <form onSubmit={submit}>
@@ -359,12 +383,12 @@ function Login({
           </div>
           <h2>Entrar no sistema</h2>
           <p>Use seu acesso corporativo para continuar.</p>
-          <Label htmlFor="email">E-mail</Label>
+          <Label htmlFor="username">Nome de usuário</Label>
           <Input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            id="username"
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             required
           />
           <Label htmlFor="password">Senha</Label>
@@ -378,7 +402,7 @@ function Login({
           <Button type="submit" disabled={busy}>
             {busy ? "Entrando..." : "Entrar"}
           </Button>
-          <small>Acesso inicial: admin@gestao.local / Admin@123</small>
+          <small>Acesso inicial: admin / Admin@123</small>
         </form>
       </section>
     </main>
@@ -397,7 +421,9 @@ export default function Home() {
     [state, setState] = useState<AppState>(() =>
       ensureFinancialSchedule(seedState),
     ),
-    [hydrated, setHydrated] = useState(false);
+    [hydrated, setHydrated] = useState(false),
+    [darkMode, setDarkMode] = useState(false),
+    [notificationsOpen, setNotificationsOpen] = useState(false);
   useEffect(() => {
     const t = localStorage.getItem("gestao-token") ?? "",
       stored = localStorage.getItem("gestao-session"),
@@ -416,6 +442,7 @@ export default function Home() {
       } catch {
         localStorage.removeItem("gestao-state");
       }
+    setDarkMode(localStorage.getItem("gestao-dark") === "1");
     setHydrated(true);
   }, []);
   useEffect(() => {
@@ -431,6 +458,21 @@ export default function Home() {
         body: JSON.stringify(state),
       }).catch(() => undefined);
   }, [state, hydrated, token]);
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem("gestao-dark", darkMode ? "1" : "0");
+  }, [darkMode, hydrated]);
+  useEffect(() => {
+    const appearance = state.settings.appearance;
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    link.href = appearance.favicon || appearance.thumbnail || appearance.logo;
+    document.title = appearance.appName;
+  }, [state.settings.appearance]);
   const commit: Commit = (action, recipe) =>
     setState((previous) => {
       const next = structuredClone(previous);
@@ -505,7 +547,14 @@ export default function Home() {
       />
     ),
     tarefas: <Tasks state={state} commit={commit} />,
-    rotas: <Routes state={state} commit={commit} />,
+    operacional: <OperationalModule state={state} commit={commit} />,
+    rotas: (
+      <RouteOperationsCenter
+        state={state}
+        commit={commit}
+        user={session.name}
+      />
+    ),
     documentos: <Documents state={state} commit={commit} />,
     recados: <Notices state={state} commit={commit} user={session.name} />,
     relatorios: <Reports state={state} />,
@@ -513,16 +562,24 @@ export default function Home() {
   }[effectiveView];
   const appearance = state.settings.appearance;
   const themeStyle = {
-    ["--brand" as string]: appearance.primary,
-    ["--brand-dark" as string]: appearance.secondary,
-    ["--surface" as string]: appearance.surface,
-    ["--page" as string]: appearance.background,
-    ["--ink" as string]: appearance.text,
+    ["--brand" as string]: darkMode
+      ? appearance.darkPrimary
+      : appearance.primary,
+    ["--brand-dark" as string]: darkMode
+      ? appearance.darkSecondary
+      : appearance.secondary,
+    ["--surface" as string]: darkMode
+      ? appearance.darkSurface
+      : appearance.surface,
+    ["--page" as string]: darkMode
+      ? appearance.darkBackground
+      : appearance.background,
+    ["--ink" as string]: darkMode ? appearance.darkText : appearance.text,
     ["--radius" as string]: `${appearance.radius}px`,
   };
   return (
     <div
-      className={`custom-theme density-${appearance.density.toLowerCase().replace("á", "a")}`}
+      className={`custom-theme ${darkMode ? "dark-mode" : ""} density-${appearance.density.toLowerCase().replace("á", "a")}`}
       style={themeStyle}
     >
       <SidebarProvider>
@@ -610,8 +667,16 @@ export default function Home() {
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={() => setDarkMode((value) => !value)}
+                title={darkMode ? "Ativar tema claro" : "Ativar tema escuro"}
+              >
+                {darkMode ? <Sun /> : <Moon />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 className="bell"
-                onClick={() => setView("recados")}
+                onClick={() => setNotificationsOpen(true)}
               >
                 <Bell />
                 <span>
@@ -622,6 +687,81 @@ export default function Home() {
           </header>
           <main className="workspace">{page}</main>
         </SidebarInset>
+        <Sheet open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+          <SheetContent className="notification-center">
+            <SheetHeader>
+              <SheetTitle>Central de notificações</SheetTitle>
+              <SheetDescription>
+                Lembretes, avisos e pendências com acesso direto à origem.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="notification-list">
+              {state.notices
+                .filter((item) => item.status === "Pendente")
+                .map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setView("recados");
+                      setNotificationsOpen(false);
+                    }}
+                  >
+                    <MessageSquareText />
+                    <span>
+                      <strong>{item.title}</strong>
+                      <small>{item.description}</small>
+                    </span>
+                    <ChevronRight />
+                  </button>
+                ))}
+              {state.emissions
+                .filter(
+                  (item) =>
+                    item.status === "Pendente" && item.scheduledDate <= today,
+                )
+                .slice(0, 8)
+                .map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setView("financeiro");
+                      setNotificationsOpen(false);
+                    }}
+                  >
+                    <ReceiptText />
+                    <span>
+                      <strong>Emissão pendente</strong>
+                      <small>
+                        {
+                          state.clients.find(
+                            (client) => client.id === item.clientId,
+                          )?.name
+                        }{" "}
+                        · {dateBR(item.scheduledDate)}
+                      </small>
+                    </span>
+                    <ChevronRight />
+                  </button>
+                ))}
+              {state.routeHolidays.slice(0, 5).map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setView("rotas");
+                    setNotificationsOpen(false);
+                  }}
+                >
+                  <CalendarDays />
+                  <span>
+                    <strong>{item.name}</strong>
+                    <small>Rota de feriado · {dateBR(item.date)}</small>
+                  </span>
+                  <ChevronRight />
+                </button>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
         <Toaster richColors position="top-right" />
       </SidebarProvider>
     </div>
@@ -883,7 +1023,14 @@ function Donut({ values, labels }: { values: number[]; labels: string[] }) {
 const blankClient: Client = {
   id: "",
   name: "",
+  legalName: "",
   document: "",
+  stateRegistration: "",
+  cep: "",
+  address: "",
+  priceTable: "TABELA EMPRESAS (E)",
+  score: 700,
+  requiresManifest: false,
   email: "",
   whatsapp: "",
   company: "Indústria de Pães Nova Esperança",
@@ -919,7 +1066,8 @@ function ClientDirectory({
     [company, setCompany] = useState("Todas");
   const [editing, setEditing] = useState<Client | null>(null),
     [profile, setProfile] = useState<Client | null>(null),
-    [removing, setRemoving] = useState<Client | null>(null);
+    [removing, setRemoving] = useState<Client | null>(null),
+    [selected, setSelected] = useState<string[]>([]);
   const filtered = state.clients.filter(
     (c) =>
       (company === "Todas" || c.company === company) &&
@@ -939,6 +1087,76 @@ function ClientDirectory({
     });
     setEditing(null);
     toast.success("Cliente salvo");
+  }
+  function exportClients(template = false) {
+    const rows = template
+      ? []
+      : state.clients.filter(
+          (client) => !selected.length || selected.includes(client.id),
+        );
+    const header = [
+      "nome_interno",
+      "razao_social",
+      "cnpj_cpf",
+      "inscricao_estadual",
+      "cep",
+      "endereco",
+      "email",
+      "whatsapp",
+      "empresa",
+      "tabela_preco",
+      "score",
+      "exige_romaneio",
+    ];
+    const values = rows.map((client) => [
+      client.name,
+      client.legalName,
+      client.document,
+      client.stateRegistration,
+      client.cep,
+      client.address,
+      client.email,
+      client.whatsapp,
+      client.company,
+      client.priceTable,
+      client.score,
+      client.requiresManifest ? "sim" : "não",
+    ]);
+    const csv = [header, ...values]
+      .map((row) =>
+        row
+          .map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`)
+          .join(";"),
+      )
+      .join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(
+      new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }),
+    );
+    link.download = template
+      ? "MODELO_IMPORTACAO_CLIENTES.csv"
+      : "CLIENTES_SELECIONADOS.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+  async function lookupCep() {
+    if (!editing?.cep) return toast.error("Informe o CEP");
+    try {
+      const response = await fetch(
+        `https://viacep.com.br/ws/${editing.cep.replace(/\D/g, "")}/json/`,
+      );
+      const data = await response.json();
+      if (data.erro) throw new Error();
+      setEditing({
+        ...editing,
+        address: [data.logradouro, data.bairro, data.localidade, data.uf]
+          .filter(Boolean)
+          .join(", "),
+      });
+      toast.success("Endereço localizado");
+    } catch {
+      toast.error("CEP não encontrado");
+    }
   }
   async function importClients(file?: File) {
     if (!file) return;
@@ -1048,6 +1266,13 @@ function ClientDirectory({
                 onChange={(e) => importClients(e.target.files?.[0])}
               />
             </Label>
+            <Button variant="outline" onClick={() => exportClients(true)}>
+              <Download /> Baixar modelo
+            </Button>
+            <Button variant="outline" onClick={() => exportClients(false)}>
+              <Download /> Exportar{" "}
+              {selected.length ? `(${selected.length})` : "todos"}
+            </Button>
             <Button onClick={() => setEditing({ ...blankClient })}>
               <Plus /> Novo cliente
             </Button>
@@ -1081,6 +1306,18 @@ function ClientDirectory({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>
+                  <Checkbox
+                    checked={
+                      selected.length === filtered.length && filtered.length > 0
+                    }
+                    onCheckedChange={(checked) =>
+                      setSelected(
+                        checked ? filtered.map((item) => item.id) : [],
+                      )
+                    }
+                  />
+                </TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Empresa</TableHead>
                 <TableHead>Fechamento</TableHead>
@@ -1093,6 +1330,18 @@ function ClientDirectory({
             <TableBody>
               {filtered.map((c) => (
                 <TableRow key={c.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selected.includes(c.id)}
+                      onCheckedChange={(checked) =>
+                        setSelected((current) =>
+                          checked
+                            ? [...new Set([...current, c.id])]
+                            : current.filter((id) => id !== c.id),
+                        )
+                      }
+                    />
+                  </TableCell>
                   <TableCell>
                     <button
                       className="client-name"
@@ -1172,7 +1421,7 @@ function ClientDirectory({
                 </DialogDescription>
               </DialogHeader>
               <div className="form-grid">
-                <Field label="Nome / Razão social">
+                <Field label="Nome interno / fantasia">
                   <Input
                     value={editing.name}
                     onChange={(e) =>
@@ -1181,11 +1430,101 @@ function ClientDirectory({
                     required
                   />
                 </Field>
-                <Field label="CNPJ / CPF">
+                <Field label="Razão social">
                   <Input
-                    value={editing.document}
+                    value={editing.legalName}
                     onChange={(e) =>
-                      setEditing({ ...editing, document: e.target.value })
+                      setEditing({ ...editing, legalName: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="CNPJ / CPF">
+                  <div className="input-action">
+                    <Input
+                      value={editing.document}
+                      onChange={(e) =>
+                        setEditing({ ...editing, document: e.target.value })
+                      }
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        if (!editing.document)
+                          return toast.error("Informe o CNPJ ou CPF");
+                        setEditing({
+                          ...editing,
+                          legalName: editing.legalName || editing.name,
+                        });
+                        toast.success(
+                          "Documento validado; confirme os dados cadastrais",
+                        );
+                      }}
+                    >
+                      Consultar
+                    </Button>
+                  </div>
+                </Field>
+                <Field label="Inscrição estadual">
+                  <Input
+                    value={editing.stateRegistration}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        stateRegistration: e.target.value,
+                      })
+                    }
+                  />
+                </Field>
+                <Field label="CEP">
+                  <div className="input-action">
+                    <Input
+                      value={editing.cep}
+                      onChange={(e) =>
+                        setEditing({ ...editing, cep: e.target.value })
+                      }
+                    />
+                    <Button type="button" variant="outline" onClick={lookupCep}>
+                      Buscar
+                    </Button>
+                  </div>
+                </Field>
+                <Field label="Endereço">
+                  <Input
+                    value={editing.address}
+                    onChange={(e) =>
+                      setEditing({ ...editing, address: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="Tabela de preço">
+                  <NativeSelect
+                    value={editing.priceTable}
+                    onChange={(e) =>
+                      setEditing({ ...editing, priceTable: e.target.value })
+                    }
+                  >
+                    {state.settings.priceTables.map((table) => (
+                      <NativeSelectOption key={table}>
+                        {table}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </Field>
+                <Field label="Score do cliente (0 a 1000)">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="1000"
+                    value={editing.score}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        score: Math.max(
+                          0,
+                          Math.min(1000, Number(e.target.value)),
+                        ),
+                      })
                     }
                   />
                 </Field>
@@ -1404,6 +1743,18 @@ function ClientDirectory({
                     }
                   />
                 </Field>
+                <div className="switch-row">
+                  <Switch
+                    checked={editing.requiresManifest}
+                    onCheckedChange={(v) =>
+                      setEditing({ ...editing, requiresManifest: v })
+                    }
+                  />
+                  <span>
+                    <strong>Exige romaneio antes do fechamento</strong>
+                    <small>Cria bloqueio e filtro no módulo financeiro</small>
+                  </span>
+                </div>
                 <div className="switch-row">
                   <Switch
                     checked={editing.requiresOrderCheck}
@@ -1683,6 +2034,23 @@ function ClientProfile({
   const group = state.settings.customerGroups.find(
     (item) => item.id === client.groupId,
   );
+  const calculatedScore = Math.max(
+    0,
+    Math.min(
+      1000,
+      (client.score ?? 700) -
+        guidance.open * 85 -
+        cols.filter((item) => item.status === "Reagendada").length * 25,
+    ),
+  );
+  const scoreLabel =
+    calculatedScore >= 850
+      ? "Excelente relacionamento"
+      : calculatedScore >= 700
+        ? "Bom pagador"
+        : calculatedScore >= 500
+          ? "Atenção ao histórico"
+          : "Risco elevado";
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="profile-sheet">
@@ -1693,10 +2061,18 @@ function ClientProfile({
           </SheetDescription>
         </SheetHeader>
         <div className="profile-score">
-          <span className={`score-dot ${client.priority.toLowerCase()}`} />
+          <div
+            className="score-gauge"
+            style={{
+              background: `conic-gradient(${calculatedScore >= 700 ? "#198754" : calculatedScore >= 500 ? "#d18a35" : "#b84036"} ${calculatedScore / 10}%, #e6e8eb 0)`,
+            }}
+          >
+            <span>{calculatedScore}</span>
+          </div>
           <div>
-            <small>Política de cobrança</small>
-            <strong>{policy?.name || client.priority}</strong>
+            <small>Score financeiro · 0 a 1000</small>
+            <strong>{scoreLabel}</strong>
+            <em>Reduz automaticamente com atrasos e reagendamentos.</em>
           </div>
           <Status>{guidance.open} vencida(s)</Status>
         </div>
@@ -1738,6 +2114,25 @@ function ClientProfile({
             <TabsTrigger value="cobrancas">Cobranças</TabsTrigger>
           </TabsList>
           <TabsContent value="dados" className="profile-data">
+            <Info
+              label="Razão social"
+              value={client.legalName || client.name}
+            />
+            <Info
+              label="Inscrição estadual"
+              value={client.stateRegistration || "Não informada"}
+            />
+            <Info
+              label="Endereço / CEP"
+              value={
+                [client.address, client.cep].filter(Boolean).join(" · ") ||
+                "Não informado"
+              }
+            />
+            <Info
+              label="Tabela de preço"
+              value={client.priceTable || "Não informada"}
+            />
             <Info label="E-mail" value={client.email} />
             <Info label="WhatsApp" value={client.whatsapp} />
             <Info
@@ -2924,7 +3319,7 @@ function TaskCatalog({ state, commit }: { state: AppState; commit: Commit }) {
     <>
       <PageTitle
         eyebrow="Checklist diário"
-        title="Tarefas de Willians e equipe"
+        title="Tarefas da equipe"
         description="Recorrências flexíveis, naturezas obrigatórias, subitens e tarefas avulsas."
         actions={
           <Button onClick={() => setEditing(blank)}>
@@ -4133,11 +4528,13 @@ function DocumentPaper({
 
 function Finance({ state, commit }: { state: AppState; commit: Commit }) {
   const [tab, setTab] = useState("painel");
+  const [selectedEvent, setSelectedEvent] = useState<PlannerEvent | null>(null);
+  const [historySearch, setHistorySearch] = useState("");
   const financeEvents: PlannerEvent[] = state.emissions.flatMap((emission) => {
     const client = state.clients.find((item) => item.id === emission.clientId);
     const issue: PlannerEvent = {
       id: `issue-${emission.id}`,
-      title: `Emitir · ${client?.name || "Cliente"}`,
+      title: `${client?.name || "Cliente"} · ${Math.max(1, emission.invoiceNumbers.length)} nota(s)`,
       date: emission.scheduledDate,
       start: "08:00",
       end: "09:00",
@@ -4296,9 +4693,7 @@ function Finance({ state, commit }: { state: AppState; commit: Commit }) {
             title="Planner financeiro"
             events={financeEvents}
             onCreate={() => setTab("emissoes")}
-            onSelect={(event) =>
-              toast.info(`${event.title} · ${dateBR(event.date)}`)
-            }
+            onSelect={setSelectedEvent}
           />
         </TabsContent>
         <TabsContent value="emissoes">
@@ -4311,6 +4706,14 @@ function Finance({ state, commit }: { state: AppState; commit: Commit }) {
               <CardDescription>
                 Registro completo de emissão, vencimento, pedido e responsável.
               </CardDescription>
+              <div className="searchbox">
+                <Search />
+                <Input
+                  value={historySearch}
+                  onChange={(event) => setHistorySearch(event.target.value)}
+                  placeholder="Buscar cliente, NF, responsável ou status"
+                />
+              </div>
             </CardHeader>
             <CardContent className="table-shell">
               <Table>
@@ -4328,6 +4731,21 @@ function Finance({ state, commit }: { state: AppState; commit: Commit }) {
                 <TableBody>
                   {state.emissions
                     .filter((item) => item.status !== "Pendente")
+                    .filter((item) => {
+                      const client =
+                        state.clients.find(
+                          (entry) => entry.id === item.clientId,
+                        )?.name || "";
+                      return [
+                        client,
+                        item.invoiceNumbers.join(" "),
+                        item.responsible,
+                        item.status,
+                      ]
+                        .join(" ")
+                        .toLowerCase()
+                        .includes(historySearch.toLowerCase());
+                    })
                     .slice()
                     .reverse()
                     .map((item) => (
@@ -4430,6 +4848,122 @@ function Finance({ state, commit }: { state: AppState; commit: Commit }) {
           <FinancialRuleSettings state={state} commit={commit} />
         </TabsContent>
       </Tabs>
+      <Dialog
+        open={Boolean(selectedEvent)}
+        onOpenChange={(open) => !open && setSelectedEvent(null)}
+      >
+        <DialogContent className="dialog-wide">
+          {selectedEvent &&
+            (() => {
+              const emissionId = selectedEvent.id.replace(/^issue-|^due-/, "");
+              const emission = state.emissions.find(
+                (item) => item.id === emissionId,
+              );
+              const client = state.clients.find(
+                (item) => item.id === emission?.clientId,
+              );
+              if (!emission)
+                return <p>Evento de calendário sem lançamento associado.</p>;
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>
+                      {client?.name} ·{" "}
+                      {Math.max(1, emission.invoiceNumbers.length)} nota(s)
+                    </DialogTitle>
+                    <DialogDescription>
+                      {emission.category} · {dateBR(emission.scheduledDate)} ·
+                      vencimento {dateBR(emission.dueDate)}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="planner-detail-grid">
+                    <Info label="Status" value={emission.status} />
+                    <Info label="Responsável" value={emission.responsible} />
+                    <Info
+                      label="Notas fiscais"
+                      value={
+                        emission.invoiceNumbers.join(", ") ||
+                        "Ainda não informadas"
+                      }
+                    />
+                    <Info label="Valor" value={money.format(emission.amount)} />
+                    <Field label="Reagendar para">
+                      <Input
+                        type="date"
+                        value={emission.scheduledDate}
+                        onChange={(event) =>
+                          commit(
+                            `Reagendou emissão de ${client?.name}`,
+                            (draft) => {
+                              const found = draft.emissions.find(
+                                (item) => item.id === emission.id,
+                              );
+                              if (found)
+                                found.scheduledDate = event.target.value;
+                            },
+                          )
+                        }
+                      />
+                    </Field>
+                    <Field label="Observações" full>
+                      <Textarea
+                        value={emission.observation}
+                        onChange={(event) =>
+                          commit(
+                            `Editou observação de ${client?.name}`,
+                            (draft) => {
+                              const found = draft.emissions.find(
+                                (item) => item.id === emission.id,
+                              );
+                              if (found) found.observation = event.target.value;
+                            },
+                          )
+                        }
+                      />
+                    </Field>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedEvent(null);
+                        setTab("emissoes");
+                      }}
+                    >
+                      <Pencil /> Abrir lançamento
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        toast.info(
+                          `Perfil de ${client?.name} disponível no módulo Clientes`,
+                        )
+                      }
+                    >
+                      <UserRound /> Perfil do cliente
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        commit(
+                          `Concluiu emissão de ${client?.name}`,
+                          (draft) => {
+                            const found = draft.emissions.find(
+                              (item) => item.id === emission.id,
+                            );
+                            if (found) found.status = "Emitida";
+                          },
+                        );
+                        setSelectedEvent(null);
+                      }}
+                    >
+                      <Check /> Concluir
+                    </Button>
+                  </DialogFooter>
+                </>
+              );
+            })()}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -4851,8 +5385,8 @@ function Tasks({ state, commit }: { state: AppState; commit: Commit }) {
     <>
       <PageTitle
         eyebrow="Módulo completo"
-        title="Tarefas e operação de Willians"
-        description="Meu dia, planner, catálogo editável, recorrências e indicadores — incluindo quinta e fim de semana."
+        title="Tarefas da equipe"
+        description="Meu dia, planner, catálogo editável, recorrências e indicadores por perfil e responsável."
       />
       <Tabs value={tab} onValueChange={setTab} className="module-tabs">
         <TabsList className="module-tabs-list">
@@ -5053,6 +5587,274 @@ function Tasks({ state, commit }: { state: AppState; commit: Commit }) {
             </Card>
           </div>
         </TabsContent>
+      </Tabs>
+    </>
+  );
+}
+
+function OperationalModule({
+  state,
+  commit,
+}: {
+  state: AppState;
+  commit: Commit;
+}) {
+  const [tab, setTab] = useState("calculadora");
+  const [category, setCategory] = useState("Pão francês");
+  const [product, setProduct] = useState("Francês 50g");
+  const [quantity, setQuantity] = useState(1000);
+  const [capacity, setCapacity] = useState(300);
+  const [rows, setRows] = useState([
+    {
+      id: "calc-frances",
+      category: "Pão francês",
+      product: "Francês 50g",
+      quantity: 1000,
+      capacity: 300,
+    },
+    {
+      id: "calc-mini",
+      category: "Pão francês",
+      product: "Mini francês",
+      quantity: 720,
+      capacity: 480,
+    },
+  ]);
+  const carts = Math.ceil(quantity / Math.max(1, capacity));
+  const operationalTasks = state.tasks.filter((task) =>
+    /produção|romaneio|etiqueta|folha|relatorio|relatório/i.test(
+      `${task.title} ${task.category}`,
+    ),
+  );
+  function addCalculation() {
+    setRows((current) => [
+      { id: uid("calculo"), category, product, quantity, capacity },
+      ...current,
+    ]);
+    toast.success("Cálculo adicionado ao plano de produção");
+  }
+  return (
+    <>
+      <PageTitle
+        eyebrow="Módulo operacional"
+        title="Central operacional de produção"
+        description="Ferramentas de produção, romaneios, etiquetas e relatórios separadas das tarefas pessoais."
+      />
+      <Tabs value={tab} onValueChange={setTab} className="module-tabs">
+        <TabsList className="module-tabs-list">
+          <TabsTrigger value="calculadora">Calculadora de produção</TabsTrigger>
+          <TabsTrigger value="producao">Produção do dia</TabsTrigger>
+          <TabsTrigger value="romaneios">Romaneios</TabsTrigger>
+          <TabsTrigger value="etiquetas">Etiquetas e folhas</TabsTrigger>
+        </TabsList>
+        <TabsContent value="calculadora">
+          <div className="operational-calculator">
+            <Card>
+              <CardHeader>
+                <CardTitle>Novo cálculo</CardTitle>
+                <CardDescription>
+                  Capacidade independente para produto normal, mini ou qualquer
+                  tipo cadastrado.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="form-grid">
+                <Field label="Categoria">
+                  <Input
+                    value={category}
+                    onChange={(event) => setCategory(event.target.value)}
+                  />
+                </Field>
+                <Field label="Produto / tipo">
+                  <Input
+                    value={product}
+                    onChange={(event) => setProduct(event.target.value)}
+                  />
+                </Field>
+                <Field label="Quantidade de unidades">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={quantity}
+                    onChange={(event) =>
+                      setQuantity(Number(event.target.value))
+                    }
+                  />
+                </Field>
+                <Field label="Capacidade por carrinho">
+                  <Input
+                    type="number"
+                    min="1"
+                    value={capacity}
+                    onChange={(event) =>
+                      setCapacity(Number(event.target.value))
+                    }
+                  />
+                </Field>
+                <div className="calculator-result full">
+                  <PackageCheck />
+                  <span>
+                    <small>Necessidade calculada</small>
+                    <strong>{carts} carrinho(s)</strong>
+                    <em>
+                      {quantity} unidades · {capacity} por carrinho
+                    </em>
+                  </span>
+                </div>
+                <Button type="button" onClick={addCalculation}>
+                  <Plus /> Adicionar ao plano
+                </Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Plano calculado</CardTitle>
+                <CardDescription>
+                  Edite quantidades e capacidades diretamente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="table-shell">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Produto</TableHead>
+                      <TableHead>Qtd.</TableHead>
+                      <TableHead>Capacidade</TableHead>
+                      <TableHead>Carrinhos</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell>{row.category}</TableCell>
+                        <TableCell>
+                          <strong>{row.product}</strong>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={row.quantity}
+                            onChange={(event) =>
+                              setRows((current) =>
+                                current.map((item) =>
+                                  item.id === row.id
+                                    ? {
+                                        ...item,
+                                        quantity: Number(event.target.value),
+                                      }
+                                    : item,
+                                ),
+                              )
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={row.capacity}
+                            onChange={(event) =>
+                              setRows((current) =>
+                                current.map((item) =>
+                                  item.id === row.id
+                                    ? {
+                                        ...item,
+                                        capacity: Number(event.target.value),
+                                      }
+                                    : item,
+                                ),
+                              )
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Status>
+                            {Math.ceil(
+                              row.quantity / Math.max(1, row.capacity),
+                            )}{" "}
+                            carrinhos
+                          </Status>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              setRows((current) =>
+                                current.filter((item) => item.id !== row.id),
+                              )
+                            }
+                          >
+                            <Trash2 />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        {[
+          ["producao", "Produção do dia", /produção/i],
+          ["romaneios", "Romaneios de entrega", /romaneio/i],
+          [
+            "etiquetas",
+            "Etiquetas, folhas e relatórios",
+            /etiqueta|folha|relatorio|relatório/i,
+          ],
+        ].map(([value, title, matcher]) => (
+          <TabsContent value={String(value)} key={String(value)}>
+            <Card>
+              <CardHeader>
+                <CardTitle>{String(title)}</CardTitle>
+                <CardDescription>
+                  Checklist operacional vinculado à base de tarefas e ao
+                  responsável.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="agenda-list">
+                {operationalTasks
+                  .filter((task) =>
+                    (matcher as RegExp).test(`${task.title} ${task.category}`),
+                  )
+                  .map((task) => (
+                    <button
+                      className="agenda-row"
+                      key={task.id}
+                      onClick={() =>
+                        commit(
+                          `Alternou tarefa operacional ${task.title}`,
+                          (draft) => {
+                            const found = draft.tasks.find(
+                              (item) => item.id === task.id,
+                            );
+                            if (found) found.completed = !found.completed;
+                          },
+                        )
+                      }
+                    >
+                      <span className="agenda-time tone-copper">
+                        {task.time}
+                      </span>
+                      <span>
+                        <strong>{task.title}</strong>
+                        <small>
+                          {task.days.join(", ")} · {task.responsible} ·{" "}
+                          {task.notes}
+                        </small>
+                      </span>
+                      <Status>
+                        {task.completed ? "Concluída" : task.nature}
+                      </Status>
+                      <CheckCircle2 />
+                    </button>
+                  ))}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
       </Tabs>
     </>
   );
@@ -5291,6 +6093,40 @@ function Documents({ state, commit }: { state: AppState; commit: Commit }) {
           <TabsTrigger value="historico">Histórico</TabsTrigger>
         </TabsList>
         <TabsContent value="biblioteca">
+          <div className="library-models">
+            <div className="section-heading">
+              <div>
+                <strong>Modelos disponíveis</strong>
+                <small>
+                  Selecione o modelo que deseja usar para abrir o gerador.
+                </small>
+              </div>
+            </div>
+            <div className="template-grid">
+              {state.settings.documentTemplates
+                .filter((template) => template.active)
+                .map((template) => (
+                  <Card className="template-card selectable" key={template.id}>
+                    <CardContent>
+                      <FilePenLine />
+                      <div>
+                        <strong>{template.name}</strong>
+                        <p>{template.title}</p>
+                        <Button size="sm" onClick={() => setTab("geradores")}>
+                          Usar modelo
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+            </div>
+          </div>
+          <div className="section-heading">
+            <div>
+              <strong>Documentos gerados</strong>
+              <small>Histórico recente da biblioteca.</small>
+            </div>
+          </div>
           <div className="template-grid">
             {state.documents.map((document) => (
               <Card className="template-card" key={document.id}>
@@ -5636,6 +6472,124 @@ function Reports({ state }: { state: AppState }) {
         />
       </div>
       <div className="reports-grid">
+        <Card>
+          <CardHeader>
+            <CardTitle>Pizza · situação das cobranças</CardTitle>
+          </CardHeader>
+          <CardContent className="chart-box">
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie
+                  data={statuses}
+                  dataKey="count"
+                  nameKey="name"
+                  innerRadius={52}
+                  outerRadius={92}
+                  paddingAngle={3}
+                >
+                  {statuses.map((item, index) => (
+                    <Cell
+                      key={item.name}
+                      fill={
+                        ["#c2783b", "#e4a854", "#2563eb", "#198754", "#b84036"][
+                          index
+                        ]
+                      }
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Radar · saúde operacional</CardTitle>
+          </CardHeader>
+          <CardContent className="chart-box">
+            <ResponsiveContainer width="100%" height={260}>
+              <RadarChart
+                data={[
+                  {
+                    subject: "Financeiro",
+                    value: Math.min(
+                      100,
+                      state.emissions.filter(
+                        (item) => item.status === "Emitida",
+                      ).length * 4,
+                    ),
+                  },
+                  {
+                    subject: "Cobranças",
+                    value: Math.min(
+                      100,
+                      state.collections.filter((item) =>
+                        ["Paga", "Baixada"].includes(item.status),
+                      ).length * 10,
+                    ),
+                  },
+                  {
+                    subject: "Tarefas",
+                    value: Math.round(
+                      (state.tasks.filter((item) => item.completed).length /
+                        Math.max(1, state.tasks.length)) *
+                        100,
+                    ),
+                  },
+                  {
+                    subject: "Rotas",
+                    value: Math.round(
+                      (state.routes.filter((item) => item.checked).length /
+                        Math.max(1, state.routes.length)) *
+                        100,
+                    ),
+                  },
+                  {
+                    subject: "Clientes",
+                    value: Math.round(
+                      (state.clients.filter((item) => item.active).length /
+                        Math.max(1, state.clients.length)) *
+                        100,
+                    ),
+                  },
+                ]}
+              >
+                <PolarGrid />
+                <PolarAngleAxis dataKey="subject" />
+                <Radar
+                  dataKey="value"
+                  stroke="#c2783b"
+                  fill="#c2783b"
+                  fillOpacity={0.35}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+        <Card className="span-2">
+          <CardHeader>
+            <CardTitle>Colunas · volume por módulo</CardTitle>
+          </CardHeader>
+          <CardContent className="chart-box">
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart
+                data={[
+                  { name: "Clientes", total: state.clients.length },
+                  { name: "Emissões", total: state.emissions.length },
+                  { name: "Cobranças", total: state.collections.length },
+                  { name: "Tarefas", total: state.tasks.length },
+                  { name: "Rotas", total: state.routes.length },
+                ]}
+              >
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="total" fill="#29445b" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle>Cobranças por status</CardTitle>

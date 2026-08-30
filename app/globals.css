@@ -2450,3 +2450,409 @@ svg {
     margin: 0;
   }
 }
+
+/* Central operacional e refinamentos solicitados */
+.dark-mode {
+  color-scheme: dark;
+}
+.dark-mode [data-slot="card"],
+.dark-mode .topbar,
+.dark-mode .planner-shell,
+.dark-mode .planner-sidebar,
+.dark-mode .planner-toolbar,
+.dark-mode .planner-day-column,
+.dark-mode [data-slot="dialog-content"],
+.dark-mode [data-slot="sheet-content"] {
+  background: var(--surface) !important;
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.dark-mode input,
+.dark-mode textarea,
+.dark-mode select {
+  background: color-mix(in srgb, var(--surface) 82%, #000);
+  color: var(--ink);
+}
+.dark-mode p,
+.dark-mode small,
+.dark-mode [data-slot="card-description"] {
+  color: color-mix(in srgb, var(--ink) 70%, transparent);
+}
+.notification-center {
+  width: min(480px, 94vw) !important;
+}
+.notification-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+.notification-list button {
+  display: grid;
+  grid-template-columns: 36px 1fr 20px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e7e4df;
+  border-radius: 14px;
+  text-align: left;
+  background: var(--surface);
+  color: var(--ink);
+}
+.notification-list button > svg:first-child {
+  width: 20px;
+  color: var(--brand);
+}
+.notification-list span {
+  display: grid;
+  gap: 3px;
+}
+.input-action {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+.score-gauge {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  padding: 8px;
+  flex: 0 0 auto;
+}
+.score-gauge span {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--surface);
+  font-weight: 800;
+  font-size: 18px;
+}
+.profile-score em {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-style: normal;
+  opacity: 0.72;
+}
+.appearance-explainer {
+  padding: 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand) 8%, var(--surface));
+}
+.appearance-explainer small {
+  display: block;
+  margin-top: 4px;
+}
+.operational-calculator {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.7fr) minmax(520px, 1.3fr);
+  gap: 18px;
+}
+.calculator-result {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand) 15%, var(--surface)),
+    var(--surface)
+  );
+  border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent);
+}
+.calculator-result > svg {
+  width: 34px;
+  height: 34px;
+  color: var(--brand);
+}
+.calculator-result span {
+  display: grid;
+}
+.calculator-result strong {
+  font-size: 24px;
+}
+.calculator-result em {
+  font-size: 12px;
+  font-style: normal;
+  opacity: 0.7;
+}
+.library-models {
+  margin-bottom: 26px;
+}
+.template-card.selectable {
+  border-color: color-mix(in srgb, var(--brand) 24%, transparent);
+}
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  margin: 12px 0;
+}
+.section-heading div {
+  display: grid;
+  gap: 3px;
+}
+.planner-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.planner-detail-grid > div:not(.field) {
+  padding: 12px;
+  border: 1px solid #e7e4df;
+  border-radius: 12px;
+  display: grid;
+}
+.chart-box {
+  min-height: 260px;
+}
+.route-command {
+  display: grid;
+  gap: 18px;
+}
+.route-command-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 15px 18px;
+  border: 1px solid #e7e4df;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.route-command-bar > div:first-child {
+  display: grid;
+  margin-right: auto;
+}
+.route-command-bar select {
+  min-width: 190px;
+}
+.route-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.route-stat [data-slot="card-content"] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+}
+.route-stat svg {
+  color: var(--brand);
+}
+.route-stat span {
+  display: grid;
+  gap: 2px;
+}
+.route-stat strong {
+  font-size: 25px;
+}
+.route-stat em {
+  font-size: 11px;
+  font-style: normal;
+  opacity: 0.68;
+}
+.route-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.7fr);
+  gap: 18px;
+}
+.route-table-head {
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.route-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.route-toolbar .searchbox {
+  min-width: 260px;
+  flex: 1;
+}
+.route-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand) 9%, var(--surface));
+}
+.route-map {
+  min-height: 560px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 20% 30%, #d8e8d2 0 8%, transparent 9%),
+    radial-gradient(circle at 75% 68%, #d4e5ee 0 11%, transparent 12%),
+    linear-gradient(135deg, #f5f1e8, #eef3ed);
+}
+.route-map::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.38;
+  background-image:
+    linear-gradient(28deg, transparent 47%, #fff 48% 51%, transparent 52%),
+    linear-gradient(112deg, transparent 47%, #fff 48% 51%, transparent 52%);
+  background-size:
+    110px 90px,
+    150px 120px;
+}
+.route-map-point {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--brand);
+  box-shadow: 0 6px 18px #0003;
+  z-index: 1;
+}
+.route-map-point span {
+  position: absolute;
+  left: 40px;
+  min-width: 130px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #fff;
+  color: #263341;
+  font-size: 11px;
+  text-align: left;
+}
+.driver-grid,
+.settings-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.driver-card [data-slot="card-content"] {
+  display: grid;
+  gap: 10px;
+}
+.driver-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface));
+  color: var(--brand);
+  font-weight: 800;
+}
+.holiday-list,
+.divergence-list,
+.version-list,
+.pending-board,
+.report-action-grid,
+.audit-list,
+.validation-list {
+  display: grid;
+  gap: 10px;
+}
+.holiday-list article,
+.divergence-list article,
+.version-list article,
+.pending-board article,
+.report-action-grid article {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e7e4df;
+  border-radius: 13px;
+}
+.holiday-list article > span,
+.divergence-list article > span,
+.version-list article > span,
+.pending-board article > span,
+.report-action-grid article > span {
+  min-width: 0;
+  flex: 1;
+}
+.holiday-date {
+  display: grid;
+  place-items: center;
+  min-width: 46px;
+  padding: 7px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--brand) 10%, var(--surface));
+}
+.pending-board,
+.report-action-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.validation-list > div,
+.audit-list > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+.route-indicator-bars {
+  display: grid;
+  gap: 14px;
+}
+.route-indicator-bars > div {
+  display: grid;
+  grid-template-columns: 210px 1fr 50px;
+  align-items: center;
+  gap: 14px;
+}
+@media (max-width: 1100px) {
+  .route-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .route-overview-grid,
+  .operational-calculator {
+    grid-template-columns: 1fr;
+  }
+  .driver-grid,
+  .settings-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .route-stats-grid,
+  .driver-grid,
+  .settings-cards,
+  .pending-board,
+  .report-action-grid,
+  .planner-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .route-command-bar {
+    align-items: stretch;
+  }
+  .route-command-bar > * {
+    width: 100%;
+  }
+  .route-table-head {
+    align-items: flex-start;
+    flex-direction: column !important;
+  }
+  .route-indicator-bars > div {
+    grid-template-columns: 1fr 48px;
+  }
+  .route-indicator-bars > div > span {
+    grid-column: 1 / -1;
+  }
+  .planner-event small {
+    display: none;
+  }
+}

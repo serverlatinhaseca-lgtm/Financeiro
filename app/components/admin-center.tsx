@@ -143,6 +143,7 @@ export function AdminCenter({
   const blankUser: UserAccount & { password?: string } = {
     id: "",
     name: "",
+    username: "",
     email: "",
     role: state.settings.profiles[0]?.name || "Administrador",
     profileId: state.settings.profiles[0]?.id || "profile-admin",
@@ -173,16 +174,26 @@ export function AdminCenter({
   }
   async function saveUser(event: FormEvent) {
     event.preventDefault();
-    if (!editingUser?.name.trim() || !editingUser.email.trim())
-      return toast.error("Informe nome e e-mail");
+    if (
+      !editingUser?.name.trim() ||
+      !editingUser.username?.trim() ||
+      !editingUser.email.trim()
+    )
+      return toast.error("Informe nome, nome de usuário e e-mail");
     const profile = state.settings.profiles.find(
       (item) => item.id === editingUser.profileId,
     );
     const item: UserAccount = {
-      ...editingUser,
       id: editingUser.id || uid("usuario"),
+      name: editingUser.name,
+      username: editingUser.username,
+      email: editingUser.email,
       role: profile?.name || editingUser.role,
       companies: editingUser.companies.length ? editingUser.companies : ["*"],
+      active: editingUser.active,
+      profileId: editingUser.profileId,
+      localPassword:
+        editingUser.password || editingUser.localPassword || "Acesso@123",
     };
     if (token !== "local-demo") {
       try {
@@ -358,6 +369,17 @@ export function AdminCenter({
                     }
                   />
                 </div>
+                <div className="field full">
+                  <AssetPicker
+                    label="Ícone do navegador (favicon)"
+                    value={appearance.favicon}
+                    onChange={(value) =>
+                      commit("Alterou ícone do navegador", (draft) => {
+                        draft.settings.appearance.favicon = value;
+                      })
+                    }
+                  />
+                </div>
               </CardContent>
             </Card>
             <Card>
@@ -374,6 +396,38 @@ export function AdminCenter({
                   ["Fundo", "background"],
                   ["Superfície", "surface"],
                   ["Texto", "text"],
+                ].map(([label, key]) => (
+                  <label key={key}>
+                    <span>{label}</span>
+                    <input
+                      type="color"
+                      value={String(appearance[key as keyof typeof appearance])}
+                      onChange={(event) =>
+                        commit(`Alterou cor ${label}`, (draft) => {
+                          (
+                            draft.settings.appearance as unknown as Record<
+                              string,
+                              string
+                            >
+                          )[key] = event.target.value;
+                        })
+                      }
+                    />
+                  </label>
+                ))}
+                <div className="field full appearance-explainer">
+                  <strong>Prévia e tema claro</strong>
+                  <small>
+                    As cores acima controlam menu, botões, fundo, cartões e
+                    textos do tema claro em todo o sistema.
+                  </small>
+                </div>
+                {[
+                  ["Escuro · Primária", "darkPrimary"],
+                  ["Escuro · Secundária", "darkSecondary"],
+                  ["Escuro · Fundo", "darkBackground"],
+                  ["Escuro · Superfície", "darkSurface"],
+                  ["Escuro · Texto", "darkText"],
                 ].map(([label, key]) => (
                   <label key={key}>
                     <span>{label}</span>
@@ -540,6 +594,7 @@ export function AdminCenter({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Usuário</TableHead>
+                    <TableHead>Login</TableHead>
                     <TableHead>E-mail</TableHead>
                     <TableHead>Perfil</TableHead>
                     <TableHead>Empresas</TableHead>
@@ -552,6 +607,9 @@ export function AdminCenter({
                     <TableRow key={account.id}>
                       <TableCell>
                         <strong>{account.name}</strong>
+                      </TableCell>
+                      <TableCell>
+                        <strong>@{account.username}</strong>
                       </TableCell>
                       <TableCell>{account.email}</TableCell>
                       <TableCell>{account.role}</TableCell>
@@ -971,6 +1029,22 @@ export function AdminCenter({
                         name: event.target.value,
                       })
                     }
+                  />
+                </div>
+                <div className="field">
+                  <Label>Nome de usuário</Label>
+                  <Input
+                    value={editingUser.username || ""}
+                    onChange={(event) =>
+                      setEditingUser({
+                        ...editingUser,
+                        username: event.target.value
+                          .toLowerCase()
+                          .replace(/[^a-z0-9._-]/g, ""),
+                      })
+                    }
+                    placeholder="ex.: willians"
+                    required
                   />
                 </div>
                 <div className="field">

@@ -175,6 +175,13 @@ function migrateClient(client: Partial<Client>): Client {
     active: client.active ?? true,
     tags: client.tags || [],
     notes: client.notes || "",
+    legalName: client.legalName || client.name || "",
+    stateRegistration: client.stateRegistration || "",
+    cep: client.cep || "",
+    address: client.address || "",
+    priceTable: client.priceTable || "TABELA EMPRESAS (E)",
+    score: Math.max(0, Math.min(1000, client.score ?? 700)),
+    requiresManifest: client.requiresManifest ?? false,
   };
 }
 
@@ -218,9 +225,15 @@ export function normalizeFinancialState(
     documentTemplates: source.settings?.documentTemplates?.length
       ? source.settings.documentTemplates
       : structuredClone(seedState.settings.documentTemplates),
-    modules: source.settings?.modules?.length
-      ? source.settings.modules
-      : structuredClone(seedState.settings.modules),
+    modules: [
+      ...(source.settings?.modules?.length
+        ? source.settings.modules
+        : structuredClone(seedState.settings.modules)),
+      ...seedState.settings.modules.filter(
+        (module) =>
+          !source.settings?.modules?.some((item) => item.id === module.id),
+      ),
+    ],
     profiles: sourceProfiles.length
       ? sourceProfiles.map((profile, index) => {
           const fallback =
@@ -234,8 +247,10 @@ export function normalizeFinancialState(
             ...profile,
             id: profile.id || fallback.id,
             description: profile.description || fallback.description,
-            moduleAccess:
-              profile.moduleAccess || structuredClone(fallback.moduleAccess),
+            moduleAccess: {
+              ...structuredClone(fallback.moduleAccess),
+              ...(profile.moduleAccess || {}),
+            },
           };
         })
       : structuredClone(seedState.settings.profiles),

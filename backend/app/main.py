@@ -37,7 +37,7 @@ app.add_middleware(
 
 
 class LoginBody(BaseModel):
-    email: str
+    username: str
     password: str
 
 
@@ -48,6 +48,7 @@ class PasswordBody(BaseModel):
 
 class AdminUserBody(BaseModel):
     name: str
+    username: str
     email: str
     role: str
     active: bool = True
@@ -98,12 +99,15 @@ def initialize_database() -> None:
             );
             """
         )
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100)")
+        cursor.execute("UPDATE users SET username = split_part(email, '@', 1) WHERE username IS NULL OR username = ''")
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique ON users (LOWER(username))")
         cursor.execute("SELECT id FROM users WHERE email = %s", (ADMIN_EMAIL,))
         if cursor.fetchone() is None:
             password_hash = bcrypt.hashpw(ADMIN_PASSWORD.encode(), bcrypt.gensalt()).decode()
             cursor.execute(
-                "INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, 'Administrador')",
-                ("Administrador", ADMIN_EMAIL, password_hash),
+                "INSERT INTO users (name, username, email, password_hash, role) VALUES (%s, %s, %s, %s, 'Administrador')",
+                ("Administrador", "admin", ADMIN_EMAIL, password_hash),
             )
         cursor.execute("INSERT INTO app_state (id) VALUES (1) ON CONFLICT (id) DO NOTHING")
 
@@ -225,7 +229,7 @@ def health() -> dict[str, str]:
 @app.post("/api/auth/login")
 def login(body: LoginBody):
     with connection() as conn, conn.cursor() as cursor:
-        cursor.execute("SELECT id, name, email, password_hash, role, active FROM users WHERE email = %s", (body.email.lower(),))
+        cursor.execute("SELECT id, name, email, password_hash, role, active FROM users WHERE LOWER(username) = LOWER(%s)", (body.username.strip(),))
         row = cursor.fetchone()
     if not row or not row[5] or not bcrypt.checkpw(body.password.encode(), row[3].encode()):
         raise HTTPException(401, "Credenciais inválidas")
@@ -251,9 +255,9 @@ def change_password(body: PasswordBody, user: dict[str, Any] = Depends(current_u
 @app.get("/api/admin/users")
 def admin_list_users(user: dict[str, Any] = Depends(require_admin)):
     with connection() as conn, conn.cursor() as cursor:
-        cursor.execute("SELECT id, name, email, role, active, created_at, updated_at FROM users ORDER BY name")
+        cursor.execute("SELECT id, name, username, email, role, active, created_at, updated_at FROM users ORDER BY name")
         rows = cursor.fetchall()
-    return [{"id": str(row[0]), "name": row[1], "email": row[2], "role": row[3], "active": row[4], "created_at": row[5], "updated_at": row[6]} for row in rows]
+    return [{"id": str(row[0]), "name": row[1], "username": row[2], "email": row[3], "role": row[4], "active": row[5], "created_at": row[6], "updated_at": row[7]} for row in rows]
 
 
 @app.post("/api/admin/users")
@@ -263,10 +267,10 @@ def admin_create_user(body: AdminUserBody, user: dict[str, Any] = Depends(requir
     password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
     try:
         with connection() as conn, conn.cursor() as cursor:
-            cursor.execute("INSERT INTO users (name, email, password_hash, role, active) VALUES (%s, %s, %s, %s, %s) RETURNING id", (body.name.strip(), body.email.lower().strip(), password_hash, body.role, body.active))
+            cursor.execute("INSERT INTO users (name, username, email, password_hash, role, active) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id", (body.name.strip(), body.username.lower().strip(), body.email.lower().strip(), password_hash, body.role, body.active))
             user_id = cursor.fetchone()[0]
     except psycopg.errors.UniqueViolation as exc:
-        raise HTTPException(409, "Já existe um usuário com este e-mail") from exc
+        raise HTTPException(409, "Já existe um usuário com este nome de usuário ou e-mail") from exc
     audit(user["id"], "admin_user_create", {"target_id": user_id, "email": body.email.lower()})
     return {"ok": True, "id": str(user_id)}
 
@@ -286,9 +290,9 @@ def admin_update_user(user_key: str, body: AdminUserBody, user: dict[str, Any] =
             if len(body.password) < 8:
                 raise HTTPException(422, "A nova senha deve ter ao menos 8 caracteres")
             password_hash = bcrypt.hashpw(body.password.encode(), bcrypt.gensalt()).decode()
-            cursor.execute("UPDATE users SET name=%s, email=%s, role=%s, active=%s, password_hash=%s, updated_at=NOW() WHERE id=%s", (body.name.strip(), body.email.lower().strip(), body.role, body.active, password_hash, target_id))
+            cursor.execute("UPDATE users SET name=%s, username=%s, email=%s, role=%s, active=%s, password_hash=%s, updated_at=NOW() WHERE id=%s", (body.name.strip(), body.username.lower().strip(), body.email.lower().strip(), body.role, body.active, password_hash, target_id))
         else:
-            cursor.execute("UPDATE users SET name=%s, email=%s, role=%s, active=%s, updated_at=NOW() WHERE id=%s", (body.name.strip(), body.email.lower().strip(), body.role, body.active, target_id))
+            cursor.execute("UPDATE users SET name=%s, username=%s, email=%s, role=%s, active=%s, updated_at=NOW() WHERE id=%s", (body.name.strip(), body.username.lower().strip(), body.email.lower().strip(), body.role, body.active, target_id))
     audit(user["id"], "admin_user_update", {"target_id": target_id})
     return {"ok": True, "id": str(target_id)}
 

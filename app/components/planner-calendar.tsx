@@ -256,6 +256,15 @@ export function PlannerCalendar({
                       60) *
                       64 || 42,
                   );
+                  const sameStart = visibleEvents.filter(
+                    (item) =>
+                      item.date === event.date &&
+                      (item.start || "09:00") === (event.start || "09:00"),
+                  );
+                  const slot = sameStart.findIndex(
+                    (item) => item.id === event.id,
+                  );
+                  const columns = Math.min(3, Math.max(1, sameStart.length));
                   return (
                     <button
                       className="planner-event"
@@ -266,6 +275,8 @@ export function PlannerCalendar({
                         borderColor: event.color,
                         background: `${event.color}18`,
                         color: event.color,
+                        left: `calc(${(slot % columns) * (100 / columns)}% + 3px)`,
+                        width: `calc(${100 / columns}% - 6px)`,
                       }}
                       onClick={() => onSelect?.(event)}
                     >
