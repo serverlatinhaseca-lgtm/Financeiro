@@ -27,9 +27,10 @@ JWT_SECRET = os.getenv("JWT_SECRET", "troque-esta-chave-em-producao")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@gestao.local").lower()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "Admin@123")
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/data/uploads"))
-MAX_UPLOAD = 5 * 1024 * 1024
+MAX_UPLOAD = 20 * 1024 * 1024
+RELEASE_ID = os.getenv("RELEASE_ID", "2026.08.31-R3-FULLSTACK")
 
-app = FastAPI(title="Gestão Operacional API", version="1.0.0")
+app = FastAPI(title="Gestão Operacional API", version="2.1.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost").split(",")],
@@ -268,7 +269,7 @@ def health() -> dict[str, str]:
     with connection() as conn, conn.cursor() as cursor:
         cursor.execute("SELECT 1")
         cursor.fetchone()
-    return {"status": "ok"}
+    return {"status": "ok", "release": RELEASE_ID, "api": "2.1.0"}
 
 
 def public_json(url: str) -> dict[str, Any]:
@@ -279,6 +280,10 @@ def public_json(url: str) -> dict[str, Any]:
     try:
         with urllib.request.urlopen(request, timeout=12) as response:
             return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise HTTPException(404, "Cadastro não encontrado") from exc
+        raise HTTPException(502, "O serviço público de consulta não respondeu") from exc
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise HTTPException(502, "O serviço público de consulta não respondeu") from exc
 
@@ -411,10 +416,21 @@ def get_state(user: dict[str, Any] = Depends(current_user)):
 @app.put("/api/state")
 def put_state(payload: dict[str, Any], user: dict[str, Any] = Depends(current_user)):
     with connection() as conn, conn.cursor() as cursor:
+        cursor.execute("SELECT payload, version FROM app_state WHERE id = 1 FOR UPDATE")
+        previous_payload, previous_version = cursor.fetchone()
+        previous_payload = previous_payload or {}
+        changed_sections = sorted(
+            key for key in set(previous_payload) | set(payload)
+            if previous_payload.get(key) != payload.get(key)
+        )
         cursor.execute("UPDATE app_state SET payload = %s::jsonb, version = version + 1, updated_by = %s, updated_at = NOW() WHERE id = 1 RETURNING version, updated_at", (json.dumps(payload), user["id"]))
         version, updated_at = cursor.fetchone()
-    audit(user["id"], "state_update", {"version": version})
-    return {"ok": True, "version": version, "updated_at": updated_at}
+    audit(user["id"], "state_update", {
+        "previous_version": previous_version,
+        "version": version,
+        "changed_sections": changed_sections,
+    })
+    return {"ok": True, "version": version, "updated_at": updated_at, "changed_sections": changed_sections}
 
 
 @app.get("/api/backup")
@@ -540,7 +556,7 @@ async def upload_file(file: UploadFile = File(...), user: dict[str, Any] = Depen
     from uuid import uuid4
     content = await file.read(MAX_UPLOAD + 1)
     if len(content) > MAX_UPLOAD:
-        raise HTTPException(413, "Arquivo maior que 5 MB")
+        raise HTTPException(413, "Arquivo maior que 20 MB")
     file_id = uuid4()
     extension = Path(file.filename or "arquivo").suffix.lower()[:10]
     destination = UPLOAD_DIR / f"{file_id}{extension}"
@@ -555,7 +571,7 @@ async def upload_file(file: UploadFile = File(...), user: dict[str, Any] = Depen
 async def import_clients(file: UploadFile = File(...), user: dict[str, Any] = Depends(current_user)):
     content = await file.read(MAX_UPLOAD + 1)
     if len(content) > MAX_UPLOAD:
-        raise HTTPException(413, "Planilha maior que 5 MB")
+        raise HTTPException(413, "Planilha maior que 20 MB")
     suffix = Path(file.filename or "").suffix.lower()
     raw_rows: list[dict[str, Any]] = []
     if suffix == ".csv":

@@ -34,6 +34,7 @@ run_as_root() {
 command -v docker >/dev/null 2>&1 || fail "Docker não encontrado. Instale Docker Engine e execute novamente."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 não encontrado. Instale o plugin docker-compose-plugin."
 docker info >/dev/null 2>&1 || fail "O Docker não está em execução ou seu usuário não possui permissão."
+command -v python3 >/dev/null 2>&1 || fail "Python 3 é necessário no servidor para validar o login após a instalação."
 [[ -f docker-compose.yml ]] || fail "Execute o instalador na pasta raiz do projeto."
 [[ -f frontend/Dockerfile ]] || fail "Dockerfile do frontend não encontrado em frontend/."
 
@@ -41,7 +42,7 @@ ensure_buildx() {
   if docker buildx version >/dev/null 2>&1; then
     ok "Docker Buildx disponível"
   else
-    ok "Buildx ausente; o frontend leve pré-compilado não depende dele"
+    fail "Docker Buildx não está disponível. Instale docker-buildx-plugin para compilar o frontend corrigido."
   fi
 }
 
@@ -106,6 +107,13 @@ else
   ok "Arquivo .env existente preservado"
 fi
 
+if ! grep -q '^RELEASE_ID=' .env; then
+  printf '\nRELEASE_ID=2026.08.31-R3-FULLSTACK\n' >> .env
+fi
+EXPECTED_RELEASE="$(sed -n 's/^RELEASE_ID=//p' .env | tail -n 1)"
+[[ "$EXPECTED_RELEASE" == "2026.08.31-R3-FULLSTACK" ]] || fail "RELEASE_ID inesperado no .env: $EXPECTED_RELEASE"
+ok "Versão de implantação confirmada: $EXPECTED_RELEASE"
+
 required_keys=(POSTGRES_PASSWORD JWT_SECRET ADMIN_PASSWORD)
 for key in "${required_keys[@]}"; do
   value="$(sed -n "s/^${key}=//p" .env | tail -n 1)"
@@ -120,31 +128,14 @@ ok "Configuração válida"
 build_service() {
   local service="$1"
   local log_file="${PROJECT_DIR}/.build-${service}.log"
-  info "Construindo ${service}"
-  if docker compose --progress plain build "$service" 2>&1 | tee "$log_file"; then
-    ok "Imagem ${service} construída"
-    return
-  fi
-
-  info "Recuperando cache de construção e repetindo ${service}"
-  if grep -Eqi 'invalid tar header|invalid checksum|failed to apply diff|failed to unpack image' "$log_file"; then
-    if command -v systemctl >/dev/null 2>&1; then
-      run_as_root systemctl restart docker || true
-      for _ in $(seq 1 30); do
-        docker info >/dev/null 2>&1 && break
-        sleep 1
-      done
-    fi
-  fi
+  info "Construindo ${service} DO ZERO (sem cache)"
   docker builder prune -af >/dev/null 2>&1 || true
-  docker image prune -f >/dev/null 2>&1 || true
   if docker compose --progress plain build --no-cache "$service" 2>&1 | tee "$log_file"; then
-    ok "Imagem ${service} construída após recuperação"
+    ok "Imagem ${service} construída sem reutilizar camadas antigas"
     return
   fi
-
-  tail -n 100 "$log_file" >&2 || true
-  fail "Falha ao construir ${service}. O erro real foi salvo em ${log_file}."
+  tail -n 140 "$log_file" >&2 || true
+  fail "Falha ao construir ${service}. Nenhum frontend antigo será tratado como nova versão. Veja ${log_file}."
 }
 
 build_service backend
@@ -184,7 +175,7 @@ fi
 ok "Credencial do banco sincronizada sem apagar dados"
 
 info "Iniciando API, frontend e Nginx"
-if ! docker compose up -d --remove-orphans backend frontend nginx; then
+if ! docker compose up -d --remove-orphans --force-recreate backend frontend nginx; then
   docker compose logs --tail=120 || true
   fail "Os serviços não iniciaram. As últimas linhas foram exibidas acima."
 fi
@@ -218,11 +209,13 @@ docker compose exec -T backend python -m app.reset_admin || fail "Não foi poss�
 ok "Administrador sincronizado com ADMIN_PASSWORD"
 
 if command -v curl >/dev/null 2>&1; then
-  curl --fail --silent --show-error http://localhost/api/health >/dev/null || fail "A API iniciou, mas não respondeu pelo Nginx."
-  home_html="$(curl --fail --silent --show-error http://localhost/)" || fail "O frontend não respondeu pelo Nginx."
+  health_json="$(curl --fail --silent --show-error -H 'Cache-Control: no-cache' http://localhost/api/health)" || fail "A API iniciou, mas não respondeu pelo Nginx."
+  [[ "$health_json" == *"$EXPECTED_RELEASE"* ]] || fail "A API respondeu, mas é uma versão antiga. Esperada: $EXPECTED_RELEASE. Resposta: $health_json"
+  home_html="$(curl --fail --silent --show-error -H 'Cache-Control: no-cache' "http://localhost/?release=$EXPECTED_RELEASE")" || fail "O frontend não respondeu pelo Nginx."
   [[ "$home_html" == *"Gestão Operacional"* || "$home_html" == *"Gestao Operacional"* ]] \
     || fail "O frontend respondeu, mas não entregou a aplicação esperada."
-  ok "Frontend e API respondendo pelo endereço principal"
+  [[ "$home_html" == *"$EXPECTED_RELEASE"* ]] || fail "O frontend servido ainda é antigo: a assinatura $EXPECTED_RELEASE não apareceu no HTML."
+  ok "Frontend, API e assinatura de versão conferidos pelo Nginx"
 
   admin_user="admin"
   admin_email="$(sed -n 's/^ADMIN_EMAIL=//p' .env | tail -n 1)"
@@ -237,6 +230,13 @@ if command -v curl >/dev/null 2>&1; then
   curl --fail --silent --show-error -H 'Content-Type: application/json' -d "$login_payload_email" http://localhost/api/auth/login >/dev/null \
     || fail "A aplicação subiu, mas o login por e-mail falhou. A instalação foi interrompida para não entregar um site inacessível."
   ok "Login validado por usuário e por e-mail"
+
+  login_response="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -d "$login_payload_user" http://localhost/api/auth/login)"
+  api_token="$(printf '%s' "$login_response" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("token", ""))')"
+  [[ -n "$api_token" ]] || fail "Login respondeu sem token de sessão."
+  curl --fail --silent --show-error -H "Authorization: Bearer $api_token" http://localhost/api/state >/dev/null \
+    || fail "Login funciona, mas a leitura do estado autenticado falhou."
+  ok "Sessão autenticada e estado da aplicação validados"
 fi
 
 server_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"

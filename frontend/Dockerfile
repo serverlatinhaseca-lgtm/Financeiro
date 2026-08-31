@@ -8,7 +8,7 @@ RUN unzip -q /tmp/CODIGO_FONTE_COMPLETO.zip -d /src \
  && rm /tmp/CODIGO_FONTE_COMPLETO.zip
 
 # A versão publicada é SEMPRE recompilada a partir do código corrigido.
-RUN npm ci --no-audit --no-fund
+RUN npm ci --no-audit --no-fund --fetch-retries=5 --fetch-retry-maxtimeout=120000
 RUN ./node_modules/.bin/vinext build
 
 # O build só é aceito se todos os contratos automatizados passarem.
