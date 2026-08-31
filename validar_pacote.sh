@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
-EXPECTED='2026.08.31-R4-FULLSTACK'
+EXPECTED='2026.08.31-R5-FULLSTACK'
 pass=0
 ok(){ echo "✔ $1"; pass=$((pass+1)); }
 fail(){ echo "✖ $1" >&2; exit 1; }
@@ -21,14 +21,17 @@ ok "Scripts SSH sem erro de sintaxe"
 python3 - <<'PY'
 from zipfile import ZipFile
 from pathlib import Path
-EXPECTED='2026.08.31-R4-FULLSTACK'
+EXPECTED='2026.08.31-R5-FULLSTACK'
 zp=Path('frontend/CODIGO_FONTE_COMPLETO.zip')
 with ZipFile(zp) as z:
     names=set(z.namelist())
-    required=['app/page.tsx','app/components/route-map.tsx','app/components/planner-calendar.tsx','tests/latest-requirements.test.mjs','tests/release-contract.test.mjs','package.json','package-lock.json']
+    required=['app/page.tsx','app/components/route-map.tsx','app/components/planner-calendar.tsx','tests/latest-requirements.test.mjs','tests/release-contract.test.mjs','package.json','package-lock.json','vite.config.ts']
     missing=[x for x in required if x not in names]
     if missing: raise SystemExit('Arquivos ausentes no frontend: '+', '.join(missing))
     page=z.read('app/page.tsx').decode('utf-8','replace')
+    vite=z.read('vite.config.ts').decode('utf-8','replace')
+    if 'sites-vite-plugin' in vite: raise SystemExit('vite.config.ts ainda depende de sites-vite-plugin ausente')
+    if 'plugins: [vinext()]' not in vite: raise SystemExit('vite.config.ts não está no modo Docker/Node simplificado')
     route=z.read('app/components/route-map.tsx').decode('utf-8','replace')
     planner=z.read('app/components/planner-calendar.tsx').decode('utf-8','replace')
     routeops=z.read('app/components/route-operations-center.tsx').decode('utf-8','replace')

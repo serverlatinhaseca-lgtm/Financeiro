@@ -1,6 +1,6 @@
 # Gestão Operacional — R3 Full Stack
 
-Versão: `2026.08.31-R4-FULLSTACK`
+Versão: `2026.08.31-R5-FULLSTACK`
 
 ## Correções desta revisão
 
