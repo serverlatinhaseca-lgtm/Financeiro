@@ -50,13 +50,13 @@ ensure_buildx
 ensure_frontend_build_tools() {
   local frontend_dockerfile="frontend/Dockerfile"
   [[ -f "$frontend_dockerfile" ]] || fail "Dockerfile do frontend não encontrado."
-  [[ -f frontend/dist/server/index.js ]] || fail "Frontend compilado não encontrado em frontend/dist."
+  [[ -f frontend/CODIGO_FONTE_COMPLETO.zip ]] || fail "Código-fonte corrigido do frontend não encontrado."
   [[ -f frontend/runtime-server.mjs ]] || fail "Servidor do frontend não encontrado."
-  ok "Frontend completo e pré-compilado confirmado"
+  ok "Código-fonte corrigido confirmado; o frontend será recompilado e testado"
 }
 
 ensure_frontend_build_tools
-ok "Frontend leve: sem node_modules, npm, Buildx ou scripts externos"
+ok "Frontend será construído do zero a partir desta revisão"
 
 random_hex() {
   local bytes="$1"
