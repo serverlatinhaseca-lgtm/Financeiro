@@ -47,7 +47,9 @@ O instalador:
 - valida Docker, Compose e as variáveis obrigatórias;
 - constrói backend e frontend com todas as dependências necessárias;
 - recupera automaticamente cache de construção corrompido quando o Docker retorna `invalid tar header`;
+- instala ou valida o plugin Docker Buildx, evitando os erros `invalid tar header` e `gzip: invalid checksum` do construtor clássico;
 - sincroniza a senha do `.env` com um volume PostgreSQL já existente sem apagar dados;
+- permite sincronizar explicitamente o acesso do administrador sem apagar usuários ou dados;
 - inicia PostgreSQL, API, frontend e Nginx;
 - aguarda os serviços ficarem saudáveis;
 - testa a API e mostra o IP, usuário e senha inicial.
@@ -60,6 +62,12 @@ Se esta for uma primeira instalação e já existir um `.env` que deve ser desca
 
 O arquivo anterior será preservado como backup. O instalador sincroniza a nova senha com o banco existente; ainda assim, mantenha backups antes de qualquer mudança de credenciais em produção.
 
+Se a senha administrativa do `.env` não corresponde mais ao banco, execute:
+
+```bash
+./install.sh --reset-admin-password
+```
+
 Acesse `http://IP_DO_SERVIDOR` sem informar porta.
 
 O Nginx publica o sistema na porta 80. O banco e a API não ficam expostos diretamente.
@@ -67,7 +75,7 @@ O Nginx publica o sistema na porta 80. O banco e a API não ficam expostos diret
 ## Acesso inicial
 
 - E-mail: valor de `ADMIN_EMAIL` no `.env` (padrão `admin@gestao.local`).
-- Senha: valor de `ADMIN_PASSWORD` no `.env` (padrão de exemplo `Admin@123`).
+- Senha: valor de `ADMIN_PASSWORD` no `.env`. Em uma primeira instalação, o instalador gera e exibe uma senha aleatória.
 
 Troque a senha antes do uso real. As senhas são armazenadas com hash bcrypt.
 
@@ -84,8 +92,11 @@ Para atualizar após enviar uma nova versão ao GitHub:
 
 ```bash
 git pull
-docker compose up -d --build
+chmod +x install.sh scripts/*.sh
+./install.sh
 ```
+
+Consulte também `INSTALACAO_SSH.md`. Não use `docker compose down -v`, pois isso remove o banco e os uploads.
 
 ## Backup
 

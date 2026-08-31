@@ -5,16 +5,31 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
 REGENERATE_ENV=false
-if [[ "${1:-}" == "--regenerate-env" ]]; then
-  REGENERATE_ENV=true
-elif [[ -n "${1:-}" ]]; then
-  echo "Uso: ./install.sh [--regenerate-env]" >&2
-  exit 64
-fi
+RESET_ADMIN_PASSWORD=false
+for argument in "$@"; do
+  case "$argument" in
+    --regenerate-env) REGENERATE_ENV=true ;;
+    --reset-admin-password) RESET_ADMIN_PASSWORD=true ;;
+    *)
+      echo "Uso: ./install.sh [--regenerate-env] [--reset-admin-password]" >&2
+      exit 64
+      ;;
+  esac
+done
 
 info() { printf '\n\033[1;36m==> %s\033[0m\n' "$1"; }
 ok() { printf '\033[1;32m✔ %s\033[0m\n' "$1"; }
 fail() { printf '\033[1;31m✖ %s\033[0m\n' "$1" >&2; exit 1; }
+
+run_as_root() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    fail "A instalação do Buildx exige root ou sudo. Instale docker-buildx-plugin e execute novamente."
+  fi
+}
 
 command -v docker >/dev/null 2>&1 || fail "Docker não encontrado. Instale Docker Engine e execute novamente."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 não encontrado. Instale o plugin docker-compose-plugin."
@@ -22,9 +37,32 @@ docker info >/dev/null 2>&1 || fail "O Docker não está em execução ou seu us
 [[ -f docker-compose.yml ]] || fail "Execute o instalador na pasta raiz do projeto."
 [[ -f Dockerfile ]] || fail "Dockerfile do frontend não encontrado."
 
+ensure_buildx() {
+  if docker buildx version >/dev/null 2>&1; then
+    ok "Docker Buildx disponível"
+    return
+  fi
+
+  info "Instalando o componente Docker Buildx necessário"
+  if command -v dnf >/dev/null 2>&1; then
+    run_as_root dnf install -y docker-buildx-plugin
+  elif command -v apt-get >/dev/null 2>&1; then
+    run_as_root apt-get update
+    run_as_root apt-get install -y docker-buildx-plugin
+  else
+    fail "Buildx ausente. Instale docker-buildx-plugin e execute novamente."
+  fi
+  docker buildx version >/dev/null 2>&1 || fail "Buildx não ficou disponível após a instalação."
+  ok "Docker Buildx instalado"
+}
+
+ensure_buildx
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
 ensure_frontend_build_tools() {
   local marker='RUN apk add --no-cache bash coreutils'
-  local base='FROM node:22-alpine AS build'
+  local base
   local temporary
 
   if grep -Fqx "$marker" Dockerfile; then
@@ -32,7 +70,8 @@ ensure_frontend_build_tools() {
     return
   fi
 
-  grep -Fqx "$base" Dockerfile || fail "Não foi possível reconhecer a etapa de build do frontend."
+  base="$(grep -Em1 '^FROM node:22-alpine( AS build)?$' Dockerfile || true)"
+  [[ -n "$base" ]] || fail "Não foi possível reconhecer a etapa de build do frontend."
   temporary="$(mktemp "${PROJECT_DIR}/Dockerfile.install.XXXXXX")"
   awk -v base="$base" -v marker="$marker" '{ print; if ($0 == base) print marker }' Dockerfile > "$temporary"
   mv "$temporary" Dockerfile
@@ -67,7 +106,7 @@ ensure_local_hosting_config
 
 ensure_dockerignore() {
   local pattern
-  local patterns=(node_modules dist .next .git .sites-runtime .wrangler '*.zip' upload .env '.env.backup.*')
+  local patterns=(node_modules dist .next .git .sites-runtime .wrangler '*.zip' upload .env '.env.backup.*' '.build-*.log' __pycache__ '*.pyc')
   touch .dockerignore
   for pattern in "${patterns[@]}"; do
     grep -Fqx "$pattern" .dockerignore || printf '%s\n' "$pattern" >> .dockerignore
@@ -119,6 +158,7 @@ fi
 if [[ ! -f .env ]]; then
   info "Gerando configuração segura da primeira instalação"
   create_env
+  RESET_ADMIN_PASSWORD=true
   ok "Arquivo .env criado com permissões restritas"
 else
   ok "Arquivo .env existente preservado"
@@ -135,15 +175,38 @@ info "Validando a configuração"
 docker compose config >/dev/null
 ok "Configuração válida"
 
-info "Construindo backend e frontend"
-if ! docker compose build backend frontend; then
-  info "Limpando somente o cache de construção corrompido e tentando novamente"
-  docker builder prune -f >/dev/null 2>&1 || true
-  if ! docker compose build --no-cache backend frontend; then
-    docker compose logs --tail=120 || true
-    fail "A construção falhou mesmo após a recuperação do cache Docker."
+build_service() {
+  local service="$1"
+  local log_file="${PROJECT_DIR}/.build-${service}.log"
+  info "Construindo ${service}"
+  if docker compose --progress plain build "$service" 2>&1 | tee "$log_file"; then
+    ok "Imagem ${service} construída"
+    return
   fi
-fi
+
+  info "Recuperando cache de construção e repetindo ${service}"
+  if grep -Eqi 'invalid tar header|invalid checksum|failed to apply diff|failed to unpack image' "$log_file"; then
+    if command -v systemctl >/dev/null 2>&1; then
+      run_as_root systemctl restart docker || true
+      for _ in $(seq 1 30); do
+        docker info >/dev/null 2>&1 && break
+        sleep 1
+      done
+    fi
+  fi
+  docker builder prune -af >/dev/null 2>&1 || true
+  docker image prune -f >/dev/null 2>&1 || true
+  if docker compose --progress plain build --no-cache "$service" 2>&1 | tee "$log_file"; then
+    ok "Imagem ${service} construída após recuperação"
+    return
+  fi
+
+  tail -n 100 "$log_file" >&2 || true
+  fail "Falha ao construir ${service}. O erro real foi salvo em ${log_file}."
+}
+
+build_service backend
+build_service frontend
 
 info "Iniciando e validando o PostgreSQL"
 docker compose up -d database
@@ -204,6 +267,12 @@ if [[ "$ready" != true ]]; then
   docker compose ps
   docker compose logs --tail=120 backend frontend nginx || true
   fail "Os serviços não ficaram prontos dentro do tempo esperado."
+fi
+
+if [[ "$RESET_ADMIN_PASSWORD" == true ]]; then
+  info "Sincronizando acesso do administrador"
+  docker compose exec -T backend python -m app.reset_admin || fail "Não foi possível redefinir o acesso administrativo."
+  ok "Administrador sincronizado com ADMIN_PASSWORD"
 fi
 
 if command -v curl >/dev/null 2>&1; then
