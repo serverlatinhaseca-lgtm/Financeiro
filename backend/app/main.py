@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import csv
 import io
@@ -99,18 +100,43 @@ def initialize_database() -> None:
                 uploaded_by BIGINT REFERENCES users(id),
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
+            CREATE TABLE IF NOT EXISTS system_settings (
+                key VARCHAR(120) PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
             """
         )
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100)")
         cursor.execute("UPDATE users SET username = split_part(email, '@', 1) WHERE username IS NULL OR username = ''")
         cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique ON users (LOWER(username))")
+        admin_fingerprint = hashlib.sha256(ADMIN_PASSWORD.encode()).hexdigest()
+        cursor.execute(
+            "SELECT value FROM system_settings WHERE key = 'admin_password_env_fingerprint'"
+        )
+        fingerprint_row = cursor.fetchone()
         cursor.execute("SELECT id FROM users WHERE email = %s", (ADMIN_EMAIL,))
-        if cursor.fetchone() is None:
+        admin_row = cursor.fetchone()
+        if admin_row is None:
             password_hash = bcrypt.hashpw(ADMIN_PASSWORD.encode(), bcrypt.gensalt()).decode()
             cursor.execute(
                 "INSERT INTO users (name, username, email, password_hash, role) VALUES (%s, %s, %s, %s, 'Administrador')",
                 ("Administrador", "admin", ADMIN_EMAIL, password_hash),
             )
+        elif fingerprint_row is None or fingerprint_row[0] != admin_fingerprint:
+            password_hash = bcrypt.hashpw(ADMIN_PASSWORD.encode(), bcrypt.gensalt()).decode()
+            cursor.execute(
+                "UPDATE users SET password_hash = %s, active = TRUE, updated_at = NOW() WHERE id = %s",
+                (password_hash, admin_row[0]),
+            )
+        cursor.execute(
+            """
+            INSERT INTO system_settings (key, value)
+            VALUES ('admin_password_env_fingerprint', %s)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+            """,
+            (admin_fingerprint,),
+        )
         cursor.execute("INSERT INTO app_state (id) VALUES (1) ON CONFLICT (id) DO NOTHING")
 
 
