@@ -40,14 +40,13 @@ command -v python3 >/dev/null 2>&1 || fail "Python 3 é necessário no servidor 
 
 ensure_buildx() {
   if docker buildx version >/dev/null 2>&1; then
-    ok "Docker Buildx disponível"
+    ok "Docker Buildx disponível (opcional)"
   else
-    fail "Docker Buildx não está disponível. Instale docker-buildx-plugin para compilar o frontend corrigido."
+    info "Docker Buildx não encontrado; usando builder clássico compatível"
   fi
 }
 
 ensure_buildx
-
 ensure_frontend_build_tools() {
   local frontend_dockerfile="frontend/Dockerfile"
   [[ -f "$frontend_dockerfile" ]] || fail "Dockerfile do frontend não encontrado."
@@ -107,12 +106,16 @@ else
   ok "Arquivo .env existente preservado"
 fi
 
-if ! grep -q '^RELEASE_ID=' .env; then
-  printf '\nRELEASE_ID=2026.08.31-R3-FULLSTACK\n' >> .env
+# Atualizações anteriores podem ter deixado RELEASE_ID antigo no .env.
+# Preserve todas as credenciais, mas sempre sincronize apenas a assinatura da versão.
+if grep -q '^RELEASE_ID=' .env; then
+  sed -i 's/^RELEASE_ID=.*/RELEASE_ID=2026.08.31-R4-FULLSTACK/' .env
+else
+  printf '\nRELEASE_ID=2026.08.31-R4-FULLSTACK\n' >> .env
 fi
 EXPECTED_RELEASE="$(sed -n 's/^RELEASE_ID=//p' .env | tail -n 1)"
-[[ "$EXPECTED_RELEASE" == "2026.08.31-R3-FULLSTACK" ]] || fail "RELEASE_ID inesperado no .env: $EXPECTED_RELEASE"
-ok "Versão de implantação confirmada: $EXPECTED_RELEASE"
+[[ "$EXPECTED_RELEASE" == "2026.08.31-R4-FULLSTACK" ]] || fail "Não foi possível sincronizar RELEASE_ID no .env: $EXPECTED_RELEASE"
+ok "Versão de implantação sincronizada: $EXPECTED_RELEASE"
 
 required_keys=(POSTGRES_PASSWORD JWT_SECRET ADMIN_PASSWORD)
 for key in "${required_keys[@]}"; do
@@ -129,14 +132,27 @@ build_service() {
   local service="$1"
   local log_file="${PROJECT_DIR}/.build-${service}.log"
   info "Construindo ${service} DO ZERO (sem cache)"
-  docker builder prune -af >/dev/null 2>&1 || true
-  if docker compose --progress plain build --no-cache "$service" 2>&1 | tee "$log_file"; then
-    ok "Imagem ${service} construída sem reutilizar camadas antigas"
+
+  # Não exige docker-buildx-plugin. Força o builder clássico do Docker,
+  # compatível com servidores onde Buildx não está instalado.
+  if DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 docker compose build --no-cache "$service" 2>&1 | tee "$log_file"; then
+    ok "Imagem ${service} construída sem cache com builder clássico"
     return
   fi
-  tail -n 140 "$log_file" >&2 || true
-  fail "Falha ao construir ${service}. Nenhum frontend antigo será tratado como nova versão. Veja ${log_file}."
+
+  # Se Buildx existir, usa-o apenas como fallback.
+  if docker buildx version >/dev/null 2>&1; then
+    info "Builder clássico falhou; tentando Buildx como fallback"
+    if docker compose --progress plain build --no-cache "$service" 2>&1 | tee -a "$log_file"; then
+      ok "Imagem ${service} construída sem cache com Buildx"
+      return
+    fi
+  fi
+
+  tail -n 160 "$log_file" >&2 || true
+  fail "Falha ao construir ${service}. Veja ${log_file}. Nenhuma imagem antiga será reutilizada como se fosse nova."
 }
+
 
 build_service backend
 build_service frontend
