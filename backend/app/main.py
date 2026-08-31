@@ -418,6 +418,19 @@ def geocode_address(q: str):
     query = q.strip()
     if len(query) < 4 or len(query) > 240:
         raise HTTPException(422, "Informe um endereço válido")
+
+    # CEP brasileiro: resolve primeiro pelo ViaCEP e só então geocodifica o endereço completo.
+    # Isso evita depender do Nominatim reconhecer uma sequência de 8 dígitos como CEP.
+    digits = re.sub(r"\D", "", query)
+    if len(digits) == 8 and len(re.sub(r"[\d\s.-]", "", query)) == 0:
+        cep_data = public_json(f"https://viacep.com.br/ws/{digits}/json/")
+        if cep_data.get("erro"):
+            raise HTTPException(404, "CEP não encontrado")
+        query = ", ".join(filter(None, [
+            cep_data.get("logradouro"), cep_data.get("bairro"),
+            cep_data.get("localidade"), cep_data.get("uf"), digits, "Brasil"
+        ]))
+
     params = urllib.parse.urlencode(
         {
             "format": "jsonv2",

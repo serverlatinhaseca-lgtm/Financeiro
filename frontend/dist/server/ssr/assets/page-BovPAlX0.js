@@ -37713,7 +37713,7 @@ var seedState = {
 			cep: "12200-000",
 			address: "São José dos Campos - SP",
 			priceTable: "TABELA EMPRESAS (E)",
-			score: 742,
+			score: 1000,
 			requiresManifest: true
 		},
 		{
@@ -39319,7 +39319,7 @@ function migrateClient(client) {
 		cep: client.cep || "",
 		address: client.address || "",
 		priceTable: client.priceTable || "TABELA EMPRESAS (E)",
-		score: Math.max(0, Math.min(1e3, client.score ?? 700)),
+		score: Math.max(0, Math.min(1e3, client.score ?? 1000)),
 		requiresManifest: client.requiresManifest ?? false
 	};
 }
@@ -56094,7 +56094,7 @@ var blankClient = {
 	cep: "",
 	address: "",
 	priceTable: "TABELA EMPRESAS (E)",
-	score: 700,
+	score: 1000,
 	requiresManifest: false,
 	email: "",
 	whatsapp: "",
@@ -57136,7 +57136,7 @@ function ClientProfile({ client, state, onClose }) {
 	const guidance = collectionGuidance(state, client.id);
 	const policy = state.settings.colorRules.find((rule) => rule.id === client.colorRuleId);
 	const group = state.settings.customerGroups.find((item) => item.id === client.groupId);
-	const calculatedScore = Math.max(0, Math.min(1e3, (client.score ?? 700) - guidance.open * 85 - cols.filter((item) => item.status === "Reagendada").length * 25));
+	const calculatedScore = Math.max(0, Math.min(1e3, (client.score ?? 1000) - guidance.open * 85 - cols.filter((item) => item.status === "Reagendada").length * 25));
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Sheet, {
 		open: true,
 		onOpenChange: (o) => !o && onClose(),
