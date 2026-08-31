@@ -1,0 +1,21 @@
+ESTE É O PACOTE CORRETO PARA O GITHUB E PARA O SERVIDOR.
+
+1. Extraia somente o arquivo FINANCEIRO_GITHUB_PRONTO_SEM_BUILD.zip.
+2. Envie todo o conteúdo extraído para a raiz do repositório.
+3. NÃO extraia frontend/CODIGO_FONTE_COMPLETO.zip no repositório.
+4. Confirme que existem estes arquivos:
+   - docker-compose.yml
+   - install.sh
+   - frontend/Dockerfile
+   - frontend/dist/server/index.js
+
+O frontend/Dockerfile deste pacote NÃO executa npm, testes ou Buildx.
+Se o log mostrar "node --test" ou "npm ci", o servidor ainda está usando
+arquivos antigos ou o conteúdo de CODIGO_FONTE_COMPLETO.zip foi enviado por engano.
+
+No servidor:
+
+git pull
+chmod +x install.sh
+./install.sh
+
