@@ -1,13 +1,17 @@
 # Instalação por SSH
 
-O projeto deve ser instalado pelo `install.sh`. Não use `docker compose up -d --build` diretamente: o instalador verifica o Buildx, recupera cache Docker corrompido, sincroniza credenciais e só então inicia os serviços.
+O frontend já está compilado e pode ser iniciado diretamente pelo Docker Compose, sem Buildx e sem executar `npm ci` no servidor.
+
+```bash
+docker compose up -d --build
+```
 
 ## Primeira instalação
 
 ```bash
 cd ~/Financeiro
 git pull
-chmod +x install.sh scripts/*.sh
+chmod +x install.sh frontend/scripts/*.sh
 ./install.sh
 ```
 
@@ -18,7 +22,7 @@ O instalador cria o `.env`, constrói as imagens, inicia PostgreSQL, API, fronte
 ```bash
 cd ~/Financeiro
 git pull
-chmod +x install.sh scripts/*.sh
+chmod +x install.sh frontend/scripts/*.sh
 ./install.sh
 ```
 
@@ -47,5 +51,5 @@ A API deve responder `{"status":"ok"}` e todos os serviços devem estar ativos o
 
 - Não execute `docker compose down -v`: a opção `-v` apaga o banco e os uploads.
 - Não execute `npm audit fix --force`: isso pode introduzir versões incompatíveis.
-- O aviso `invalid tar header` ou `gzip: invalid checksum` é tratado pelo instalador com Buildx e uma reconstrução limpa.
-- Se o servidor não permitir `sudo`, peça ao administrador para instalar `docker-buildx-plugin` uma única vez.
+- O pacote inclui `frontend/dist`, já compilado e testado. Isso elimina a camada grande que produzia `invalid tar header` ou `gzip: invalid checksum`.
+- O Docker Buildx não é obrigatório para esta distribuição.

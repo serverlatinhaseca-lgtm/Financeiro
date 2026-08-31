@@ -5,9 +5,10 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-gestao}
       POSTGRES_USER: ${POSTGRES_USER:-gestao}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gestao-local-2026}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - postgres_socket:/var/run/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gestao} -d ${POSTGRES_DB:-gestao}"]
       interval: 5s
@@ -18,14 +19,15 @@ services:
     build: ./backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-gestao}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-gestao}
-      JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-gestao}@/${POSTGRES_DB:-gestao}?host=/var/run/postgresql
+      JWT_SECRET: ${JWT_SECRET:-troque-esta-chave-jwt-antes-do-uso-em-producao-2026}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@gestao.local}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@123}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost}
       UPLOAD_DIR: /data/uploads
     volumes:
       - uploads_data:/data/uploads
+      - postgres_socket:/var/run/postgresql
     depends_on:
       database:
         condition: service_healthy
@@ -36,7 +38,7 @@ services:
       retries: 10
 
   frontend:
-    build: .
+    build: ./frontend
     restart: unless-stopped
     depends_on:
       backend:
@@ -58,4 +60,4 @@ services:
 volumes:
   postgres_data:
   uploads_data:
-
+  postgres_socket:

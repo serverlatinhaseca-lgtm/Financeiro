@@ -37,17 +37,18 @@ Sistema web integrado e personalizável para centralizar clientes, financeiro, c
 Com Docker Engine e Docker Compose v2 instalados, execute apenas:
 
 ```bash
-chmod +x install.sh
-./install.sh
+docker compose up -d --build
 ```
+
+Na primeira inicialização sem `.env`, o acesso é `admin@gestao.local` / `Admin@123`. O `.env.example` está incluído para configurar senhas próprias antes do uso em produção.
 
 O instalador:
 
 - cria o `.env` com senhas aleatórias quando ele ainda não existe;
 - valida Docker, Compose e as variáveis obrigatórias;
-- constrói backend e frontend com todas as dependências necessárias;
+- constrói a API e empacota o frontend pré-compilado;
 - recupera automaticamente cache de construção corrompido quando o Docker retorna `invalid tar header`;
-- instala ou valida o plugin Docker Buildx, evitando os erros `invalid tar header` e `gzip: invalid checksum` do construtor clássico;
+- utiliza o frontend já compilado e validado, sem executar `npm ci` no servidor e sem criar a camada de 1,2 GB que provocava `invalid tar header` e `gzip: invalid checksum`;
 - sincroniza a senha do `.env` com um volume PostgreSQL já existente sem apagar dados;
 - permite sincronizar explicitamente o acesso do administrador sem apagar usuários ou dados;
 - inicia PostgreSQL, API, frontend e Nginx;
@@ -75,7 +76,7 @@ O Nginx publica o sistema na porta 80. O banco e a API não ficam expostos diret
 ## Acesso inicial
 
 - E-mail: valor de `ADMIN_EMAIL` no `.env` (padrão `admin@gestao.local`).
-- Senha: valor de `ADMIN_PASSWORD` no `.env`. Em uma primeira instalação, o instalador gera e exibe uma senha aleatória.
+- Senha sem `.env`: `Admin@123`. Com `.env`, use o valor de `ADMIN_PASSWORD`.
 
 Troque a senha antes do uso real. As senhas são armazenadas com hash bcrypt.
 
@@ -92,8 +93,7 @@ Para atualizar após enviar uma nova versão ao GitHub:
 
 ```bash
 git pull
-chmod +x install.sh scripts/*.sh
-./install.sh
+docker compose up -d --build
 ```
 
 Consulte também `INSTALACAO_SSH.md`. Não use `docker compose down -v`, pois isso remove o banco e os uploads.
@@ -111,6 +111,7 @@ docker compose exec -T database pg_dump -U gestao -d gestao > backup_gestao.sql
 ## Desenvolvimento sem Docker
 
 ```bash
+cd frontend
 npm ci
 npm run dev
 ```
@@ -119,10 +120,11 @@ O frontend mantém um modo local no navegador quando a API não está disponíve
 
 ## Estrutura
 
-- `app/`: interface web.
-- `app/data/route-data.json`: dados estruturados das planilhas de rotas.
+- `frontend/`: aplicação web completa, incluindo Dockerfile, componentes, arquivos públicos e scripts de build.
+- `frontend/app/`: interface web.
+- `frontend/app/data/route-data.json`: dados estruturados das planilhas de rotas.
 - `backend/`: API FastAPI, autenticação, persistência e arquivos.
 - `nginx/`: proxy reverso para acesso pela porta 80.
 - `docker-compose.yml`: frontend, backend, PostgreSQL e Nginx.
-- `public/brand/`: logos, carimbo e assinaturas fornecidos nos modelos.
+- `frontend/public/brand/`: logos, carimbo e assinaturas fornecidos nos modelos.
 - `REQUISITOS_CONVERSAS.md`: matriz detalhada das solicitações extraídas das quatro conversas e sua implementação.

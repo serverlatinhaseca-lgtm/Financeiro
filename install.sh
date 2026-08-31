@@ -35,70 +35,46 @@ command -v docker >/dev/null 2>&1 || fail "Docker não encontrado. Instale Docke
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 não encontrado. Instale o plugin docker-compose-plugin."
 docker info >/dev/null 2>&1 || fail "O Docker não está em execução ou seu usuário não possui permissão."
 [[ -f docker-compose.yml ]] || fail "Execute o instalador na pasta raiz do projeto."
-[[ -f Dockerfile ]] || fail "Dockerfile do frontend não encontrado."
+[[ -f frontend/Dockerfile ]] || fail "Dockerfile do frontend não encontrado em frontend/."
 
 ensure_buildx() {
   if docker buildx version >/dev/null 2>&1; then
     ok "Docker Buildx disponível"
-    return
-  fi
-
-  info "Instalando o componente Docker Buildx necessário"
-  if command -v dnf >/dev/null 2>&1; then
-    run_as_root dnf install -y docker-buildx-plugin
-  elif command -v apt-get >/dev/null 2>&1; then
-    run_as_root apt-get update
-    run_as_root apt-get install -y docker-buildx-plugin
   else
-    fail "Buildx ausente. Instale docker-buildx-plugin e execute novamente."
+    ok "Buildx ausente; o frontend leve pré-compilado não depende dele"
   fi
-  docker buildx version >/dev/null 2>&1 || fail "Buildx não ficou disponível após a instalação."
-  ok "Docker Buildx instalado"
 }
 
 ensure_buildx
-export DOCKER_BUILDKIT=1
-export COMPOSE_DOCKER_CLI_BUILD=1
 
 ensure_frontend_build_tools() {
-  local marker='RUN apk add --no-cache bash coreutils'
-  local base
-  local temporary
-
-  if grep -Fqx "$marker" Dockerfile; then
-    ok "Dependências do frontend já configuradas"
-    return
-  fi
-
-  base="$(grep -Em1 '^FROM node:22-alpine( AS build)?$' Dockerfile || true)"
-  [[ -n "$base" ]] || fail "Não foi possível reconhecer a etapa de build do frontend."
-  temporary="$(mktemp "${PROJECT_DIR}/Dockerfile.install.XXXXXX")"
-  awk -v base="$base" -v marker="$marker" '{ print; if ($0 == base) print marker }' Dockerfile > "$temporary"
-  mv "$temporary" Dockerfile
-  chmod 644 Dockerfile
-  ok "Dockerfile preparado automaticamente para Alpine"
+  local frontend_dockerfile="frontend/Dockerfile"
+  [[ -f "$frontend_dockerfile" ]] || fail "Dockerfile do frontend não encontrado."
+  [[ -f frontend/dist/server/index.js ]] || fail "Frontend compilado não encontrado em frontend/dist."
+  [[ -f frontend/runtime-server.mjs ]] || fail "Servidor do frontend não encontrado."
+  ok "Frontend completo e pré-compilado confirmado"
 }
 
 ensure_frontend_build_tools
 
-[[ -d scripts ]] || fail "Pasta scripts não encontrada."
-find scripts -type f -name '*.sh' -exec chmod 755 {} +
+[[ -d frontend/scripts ]] || fail "Pasta frontend/scripts não encontrada."
+find frontend/scripts -type f -name '*.sh' -exec chmod 755 {} +
 ok "Permissões dos scripts internos corrigidas"
 
 ensure_local_hosting_config() {
-  if [[ -f .openai/hosting.json ]]; then
+  if [[ -f frontend/.openai/hosting.json ]]; then
     ok "Configuração local de build já existente"
     return
   fi
 
-  mkdir -p .openai
+  mkdir -p frontend/.openai
   {
     printf '{\n'
     printf '  "d1": null,\n'
     printf '  "project_id": "local-docker",\n'
     printf '  "r2": null\n'
     printf '}\n'
-  } > .openai/hosting.json
+  } > frontend/.openai/hosting.json
   ok "Configuração local de build criada"
 }
 
@@ -106,10 +82,10 @@ ensure_local_hosting_config
 
 ensure_dockerignore() {
   local pattern
-  local patterns=(node_modules dist .next .git .sites-runtime .wrangler '*.zip' upload .env '.env.backup.*' '.build-*.log' __pycache__ '*.pyc')
-  touch .dockerignore
+  local patterns=(node_modules .next .git .sites-runtime .wrangler '*.zip' upload .env '.env.backup.*' '.build-*.log' __pycache__ '*.pyc')
+  touch frontend/.dockerignore
   for pattern in "${patterns[@]}"; do
-    grep -Fqx "$pattern" .dockerignore || printf '%s\n' "$pattern" >> .dockerignore
+    grep -Fqx "$pattern" frontend/.dockerignore || printf '%s\n' "$pattern" >> frontend/.dockerignore
   done
   ok "Arquivos locais e credenciais protegidos do contexto Docker"
 }
