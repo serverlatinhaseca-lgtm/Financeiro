@@ -1,0 +1,7 @@
+GESTAO OPERACIONAL - REVISAO REAL
+Versao: 2026-08-31-R2
+Gerado em: 2026-08-31
+
+Esta versao foi empacotada a partir da fonte corrigida em /mnt/data/rework/source.
+O frontend deve ser compilado a partir de frontend/CODIGO_FONTE_COMPLETO.zip pelo Dockerfile.
+Nao reutilizar frontend/dist de versoes anteriores.
