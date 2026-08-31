@@ -28,7 +28,7 @@ ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@gestao.local").lower()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "Admin@123")
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/data/uploads"))
 MAX_UPLOAD = 20 * 1024 * 1024
-RELEASE_ID = os.getenv("RELEASE_ID", "2026.08.31-R5-FULLSTACK")
+RELEASE_ID = os.getenv("RELEASE_ID", "2026.08.31-R6-FULLSTACK")
 
 app = FastAPI(title="Gestão Operacional API", version="2.1.0")
 app.add_middleware(

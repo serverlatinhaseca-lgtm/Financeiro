@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
-EXPECTED="2026.08.31-R5-FULLSTACK"
+EXPECTED="2026.08.31-R6-FULLSTACK"
 fail(){ echo "✖ $*" >&2; exit 1; }
 ok(){ echo "✔ $*"; }
 command -v curl >/dev/null || fail "curl não instalado"

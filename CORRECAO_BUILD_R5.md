@@ -10,4 +10,4 @@ Correção aplicada:
 - varredura de imports locais: nenhum import relativo ausente;
 - validador do pacote agora rejeita novamente qualquer fonte que dependa de `sites-vite-plugin`.
 
-Release: `2026.08.31-R5-FULLSTACK`.
+Release: `2026.08.31-R6-FULLSTACK`.

@@ -109,12 +109,12 @@ fi
 # Atualizações anteriores podem ter deixado RELEASE_ID antigo no .env.
 # Preserve todas as credenciais, mas sempre sincronize apenas a assinatura da versão.
 if grep -q '^RELEASE_ID=' .env; then
-  sed -i 's/^RELEASE_ID=.*/RELEASE_ID=2026.08.31-R5-FULLSTACK/' .env
+  sed -i 's/^RELEASE_ID=.*/RELEASE_ID=2026.08.31-R6-FULLSTACK/' .env
 else
-  printf '\nRELEASE_ID=2026.08.31-R5-FULLSTACK\n' >> .env
+  printf '\nRELEASE_ID=2026.08.31-R6-FULLSTACK\n' >> .env
 fi
 EXPECTED_RELEASE="$(sed -n 's/^RELEASE_ID=//p' .env | tail -n 1)"
-[[ "$EXPECTED_RELEASE" == "2026.08.31-R5-FULLSTACK" ]] || fail "Não foi possível sincronizar RELEASE_ID no .env: $EXPECTED_RELEASE"
+[[ "$EXPECTED_RELEASE" == "2026.08.31-R6-FULLSTACK" ]] || fail "Não foi possível sincronizar RELEASE_ID no .env: $EXPECTED_RELEASE"
 ok "Versão de implantação sincronizada: $EXPECTED_RELEASE"
 
 required_keys=(POSTGRES_PASSWORD JWT_SECRET ADMIN_PASSWORD)

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
-EXPECTED='2026.08.31-R5-FULLSTACK'
+EXPECTED='2026.08.31-R6-FULLSTACK'
 pass=0
 ok(){ echo "✔ $1"; pass=$((pass+1)); }
 fail(){ echo "✖ $1" >&2; exit 1; }
@@ -21,21 +21,38 @@ ok "Scripts SSH sem erro de sintaxe"
 python3 - <<'PY'
 from zipfile import ZipFile
 from pathlib import Path
-EXPECTED='2026.08.31-R5-FULLSTACK'
+EXPECTED='2026.08.31-R6-FULLSTACK'
 zp=Path('frontend/CODIGO_FONTE_COMPLETO.zip')
 with ZipFile(zp) as z:
     names=set(z.namelist())
-    required=['app/page.tsx','app/components/route-map.tsx','app/components/planner-calendar.tsx','tests/latest-requirements.test.mjs','tests/release-contract.test.mjs','package.json','package-lock.json','vite.config.ts']
+    required=['app/page.tsx','app/components/route-map.tsx','app/components/planner-calendar.tsx','tests/latest-requirements.test.mjs','tests/release-contract.test.mjs','tests/alias-imports.test.mjs','lib/utils.ts','hooks/use-mobile.ts','package.json','package-lock.json','vite.config.ts']
     missing=[x for x in required if x not in names]
     if missing: raise SystemExit('Arquivos ausentes no frontend: '+', '.join(missing))
     page=z.read('app/page.tsx').decode('utf-8','replace')
     vite=z.read('vite.config.ts').decode('utf-8','replace')
     if 'sites-vite-plugin' in vite: raise SystemExit('vite.config.ts ainda depende de sites-vite-plugin ausente')
     if 'plugins: [vinext()]' not in vite: raise SystemExit('vite.config.ts não está no modo Docker/Node simplificado')
+
+    # Verifica imports alias @/ diretamente dentro do ZIP para evitar Module not found no vinext.
+    import re, posixpath
+    text_names={n for n in names if n.endswith(('.ts','.tsx','.js','.jsx','.mjs'))}
+    def alias_exists(target):
+        base=target[2:]
+        candidates=[base, base+'.ts', base+'.tsx', base+'.js', base+'.jsx', base+'.mjs',
+                    posixpath.join(base,'index.ts'), posixpath.join(base,'index.tsx'),
+                    posixpath.join(base,'index.js'), posixpath.join(base,'index.jsx')]
+        return any(c in names for c in candidates)
+    missing_alias=[]
+    pattern=re.compile(r'''(?:from\s+|import\s*\(?\s*)["'](@/[^"']+)["']''')
+    for name in sorted(text_names):
+        text=z.read(name).decode('utf-8','replace')
+        for target in pattern.findall(text):
+            if not alias_exists(target): missing_alias.append(f'{name} -> {target}')
+    if missing_alias: raise SystemExit('Imports @/ ausentes no ZIP: '+', '.join(missing_alias[:20]))
     route=z.read('app/components/route-map.tsx').decode('utf-8','replace')
     planner=z.read('app/components/planner-calendar.tsx').decode('utf-8','replace')
     routeops=z.read('app/components/route-operations-center.tsx').decode('utf-8','replace')
-    if EXPECTED not in page: raise SystemExit('Assinatura R4 ausente no frontend')
+    if EXPECTED not in page: raise SystemExit('Assinatura R6 ausente no frontend')
     if 'fallbackCoordinate' in route: raise SystemExit('Mapa ainda contém fallbackCoordinate')
     checks=[
       ('score 1000','1000' in page),
