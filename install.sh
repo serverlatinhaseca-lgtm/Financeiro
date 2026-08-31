@@ -56,41 +56,7 @@ ensure_frontend_build_tools() {
 }
 
 ensure_frontend_build_tools
-
-[[ -d frontend/scripts ]] || fail "Pasta frontend/scripts não encontrada."
-find frontend/scripts -type f -name '*.sh' -exec chmod 755 {} +
-ok "Permissões dos scripts internos corrigidas"
-
-ensure_local_hosting_config() {
-  if [[ -f frontend/.openai/hosting.json ]]; then
-    ok "Configuração local de build já existente"
-    return
-  fi
-
-  mkdir -p frontend/.openai
-  {
-    printf '{\n'
-    printf '  "d1": null,\n'
-    printf '  "project_id": "local-docker",\n'
-    printf '  "r2": null\n'
-    printf '}\n'
-  } > frontend/.openai/hosting.json
-  ok "Configuração local de build criada"
-}
-
-ensure_local_hosting_config
-
-ensure_dockerignore() {
-  local pattern
-  local patterns=(node_modules .next .git .sites-runtime .wrangler '*.zip' upload .env '.env.backup.*' '.build-*.log' __pycache__ '*.pyc')
-  touch frontend/.dockerignore
-  for pattern in "${patterns[@]}"; do
-    grep -Fqx "$pattern" frontend/.dockerignore || printf '%s\n' "$pattern" >> frontend/.dockerignore
-  done
-  ok "Arquivos locais e credenciais protegidos do contexto Docker"
-}
-
-ensure_dockerignore
+ok "Frontend leve: sem node_modules, npm, Buildx ou scripts externos"
 
 random_hex() {
   local bytes="$1"

@@ -11,7 +11,7 @@ docker compose up -d --build
 ```bash
 cd ~/Financeiro
 git pull
-chmod +x install.sh frontend/scripts/*.sh
+chmod +x install.sh
 ./install.sh
 ```
 
@@ -22,7 +22,7 @@ O instalador cria o `.env`, constrói as imagens, inicia PostgreSQL, API, fronte
 ```bash
 cd ~/Financeiro
 git pull
-chmod +x install.sh frontend/scripts/*.sh
+chmod +x install.sh
 ./install.sh
 ```
 

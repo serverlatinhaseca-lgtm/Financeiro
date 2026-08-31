@@ -111,7 +111,9 @@ docker compose exec -T database pg_dump -U gestao -d gestao > backup_gestao.sql
 ## Desenvolvimento sem Docker
 
 ```bash
-cd frontend
+mkdir frontend-source
+cd frontend-source
+unzip ../frontend/CODIGO_FONTE_COMPLETO.zip
 npm ci
 npm run dev
 ```
@@ -123,10 +125,10 @@ O frontend mantém um modo local no navegador quando a API não está disponíve
 - `frontend/`: frontend executável completo e seu código-fonte arquivado.
 - `frontend/dist/`: frontend compilado utilizado diretamente pelo Docker.
 - `frontend/CODIGO_FONTE_COMPLETO.zip`: código-fonte integral preservado em um único arquivo para manter o pacote abaixo do limite de 100 arquivos do upload web do GitHub.
-- `frontend/app/`: interface web.
-- `frontend/app/data/route-data.json`: dados estruturados das planilhas de rotas.
+- `frontend/CODIGO_FONTE_COMPLETO.zip/app/`: interface web completa.
+- `frontend/CODIGO_FONTE_COMPLETO.zip/app/data/route-data.json`: dados estruturados das planilhas de rotas.
 - `backend/`: API FastAPI, autenticação, persistência e arquivos.
 - `nginx/`: proxy reverso para acesso pela porta 80.
 - `docker-compose.yml`: frontend, backend, PostgreSQL e Nginx.
-- `frontend/public/brand/`: logos, carimbo e assinaturas fornecidos nos modelos.
+- `frontend/CODIGO_FONTE_COMPLETO.zip/public/brand/`: logos, carimbo e assinaturas fornecidos nos modelos.
 - `REQUISITOS_CONVERSAS.md`: matriz detalhada das solicitações extraídas das quatro conversas e sua implementação.

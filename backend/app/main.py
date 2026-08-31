@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json
-import hashlib
 import os
 import csv
 import io
 import re
 import unicodedata
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -58,6 +58,30 @@ class AdminUserBody(BaseModel):
     password: str | None = None
 
 
+class MapPoint(BaseModel):
+    latitude: float
+    longitude: float
+
+
+class OptimizeRouteBody(BaseModel):
+    points: list[MapPoint]
+
+
+def fetch_json(url: str) -> Any:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "GestaoOperacional-Panificadora/1.0 (planejamento de entregas)",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=18) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise HTTPException(502, "Serviço externo de mapas indisponível") from exc
+
+
 def connection():
     return psycopg.connect(DATABASE_URL, autocommit=True)
 
@@ -100,43 +124,18 @@ def initialize_database() -> None:
                 uploaded_by BIGINT REFERENCES users(id),
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
-            CREATE TABLE IF NOT EXISTS system_settings (
-                key VARCHAR(120) PRIMARY KEY,
-                value TEXT NOT NULL,
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            );
             """
         )
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100)")
         cursor.execute("UPDATE users SET username = split_part(email, '@', 1) WHERE username IS NULL OR username = ''")
         cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique ON users (LOWER(username))")
-        admin_fingerprint = hashlib.sha256(ADMIN_PASSWORD.encode()).hexdigest()
-        cursor.execute(
-            "SELECT value FROM system_settings WHERE key = 'admin_password_env_fingerprint'"
-        )
-        fingerprint_row = cursor.fetchone()
         cursor.execute("SELECT id FROM users WHERE email = %s", (ADMIN_EMAIL,))
-        admin_row = cursor.fetchone()
-        if admin_row is None:
+        if cursor.fetchone() is None:
             password_hash = bcrypt.hashpw(ADMIN_PASSWORD.encode(), bcrypt.gensalt()).decode()
             cursor.execute(
                 "INSERT INTO users (name, username, email, password_hash, role) VALUES (%s, %s, %s, %s, 'Administrador')",
                 ("Administrador", "admin", ADMIN_EMAIL, password_hash),
             )
-        elif fingerprint_row is None or fingerprint_row[0] != admin_fingerprint:
-            password_hash = bcrypt.hashpw(ADMIN_PASSWORD.encode(), bcrypt.gensalt()).decode()
-            cursor.execute(
-                "UPDATE users SET password_hash = %s, active = TRUE, updated_at = NOW() WHERE id = %s",
-                (password_hash, admin_row[0]),
-            )
-        cursor.execute(
-            """
-            INSERT INTO system_settings (key, value)
-            VALUES ('admin_password_env_fingerprint', %s)
-            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
-            """,
-            (admin_fingerprint,),
-        )
         cursor.execute("INSERT INTO app_state (id) VALUES (1) ON CONFLICT (id) DO NOTHING")
 
 
@@ -412,6 +411,84 @@ def list_audit(limit: int = 100, user: dict[str, Any] = Depends(require_admin)):
         cursor.execute("SELECT a.id, COALESCE(u.name, 'Sistema'), a.action, a.details, a.created_at FROM audit_log a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.id DESC LIMIT %s", (min(max(limit, 1), 500),))
         rows = cursor.fetchall()
     return [{"id": row[0], "user": row[1], "action": row[2], "details": row[3], "created_at": row[4]} for row in rows]
+
+
+@app.get("/api/map/geocode")
+def geocode_address(q: str):
+    query = q.strip()
+    if len(query) < 4 or len(query) > 240:
+        raise HTTPException(422, "Informe um endereço válido")
+    params = urllib.parse.urlencode(
+        {
+            "format": "jsonv2",
+            "limit": 6,
+            "countrycodes": "br",
+            "addressdetails": 1,
+            "q": query,
+        }
+    )
+    payload = fetch_json(f"https://nominatim.openstreetmap.org/search?{params}")
+    results = []
+    for item in payload[:6]:
+        try:
+            results.append(
+                {
+                    "display_name": str(item["display_name"]),
+                    "lat": float(item["lat"]),
+                    "lon": float(item["lon"]),
+                }
+            )
+        except (KeyError, TypeError, ValueError):
+            continue
+    return {"results": results}
+
+
+@app.post("/api/map/optimize")
+def optimize_route(payload: OptimizeRouteBody):
+    if len(payload.points) < 2:
+        raise HTTPException(422, "A rota precisa de pelo menos duas paradas")
+    if len(payload.points) > 40:
+        raise HTTPException(422, "Calcule no máximo 40 paradas por vez")
+    for point in payload.points:
+        if not (-90 <= point.latitude <= 90 and -180 <= point.longitude <= 180):
+            raise HTTPException(422, "Coordenada inválida")
+    coordinates = ";".join(
+        f"{point.longitude:.6f},{point.latitude:.6f}" for point in payload.points
+    )
+    params = urllib.parse.urlencode(
+        {
+            "source": "first",
+            "roundtrip": "false",
+            "overview": "full",
+            "geometries": "geojson",
+            "steps": "false",
+        }
+    )
+    data = fetch_json(
+        f"https://router.project-osrm.org/trip/v1/driving/{coordinates}?{params}"
+    )
+    trips = data.get("trips") or []
+    waypoints = data.get("waypoints") or []
+    if not trips:
+        raise HTTPException(422, "Não foi possível montar uma rota viária")
+    trip = trips[0]
+    geometry = trip.get("geometry", {}).get("coordinates", [])
+    route_coordinates = [
+        [float(coordinate[1]), float(coordinate[0])]
+        for coordinate in geometry
+        if len(coordinate) >= 2
+    ]
+    order = [0] * len(waypoints)
+    for source_index, waypoint in enumerate(waypoints):
+        destination_index = int(waypoint.get("waypoint_index", source_index))
+        if 0 <= destination_index < len(order):
+            order[destination_index] = source_index
+    return {
+        "coordinates": route_coordinates,
+        "distance": round(float(trip.get("distance", 0)) / 1000, 1),
+        "duration": max(1, round(float(trip.get("duration", 0)) / 60)),
+        "order": order,
+    }
 
 
 @app.post("/api/files")
