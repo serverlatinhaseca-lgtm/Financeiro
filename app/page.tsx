@@ -303,11 +303,12 @@ function Login({
   state: AppState;
 }) {
   const [username, setUsername] = useState("admin"),
-    [password, setPassword] = useState("Admin@123"),
+    [password, setPassword] = useState(""),
     [busy, setBusy] = useState(false);
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
+    let allowLocalFallback = false;
     try {
       const r = await fetch("/api/auth/login", {
         method: "POST",
@@ -327,7 +328,16 @@ function Login({
         toast.success("Acesso liberado");
         return;
       }
-    } catch {}
+      allowLocalFallback = [404, 502, 503, 504].includes(r.status);
+      if (!allowLocalFallback) {
+        toast.error("Usuário ou senha inválidos");
+        setBusy(false);
+        return;
+      }
+    } catch {
+      allowLocalFallback = true;
+    }
+    if (!allowLocalFallback) return;
     const localAccount = state.settings.users.find(
       (account) =>
         account.active &&
@@ -411,7 +421,10 @@ function Login({
           <Button type="submit" disabled={busy}>
             {busy ? "Entrando..." : "Entrar"}
           </Button>
-          <small>Acesso inicial: admin / Admin@123</small>
+          <small>
+            Servidor: use a senha exibida pelo install.sh · Demonstração:
+            Admin@123
+          </small>
         </form>
       </section>
     </main>
