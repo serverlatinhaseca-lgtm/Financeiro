@@ -196,6 +196,8 @@ export type RouteRecord = {
   alert?: string;
   product?: string;
   quantity?: number;
+  latitude?: number;
+  longitude?: number;
 };
 
 export type RouteDriver = {
@@ -231,6 +233,7 @@ export type RoutePlan = {
   validityEnd: string;
   permanent: boolean;
   notes: string;
+  color?: string;
 };
 
 export type RouteCompetency = {
@@ -899,6 +902,7 @@ export const seedState: AppState = {
       validityEnd: "",
       permanent: true,
       notes: "Base oficial de dias úteis.",
+      color: "#f97316",
     },
     {
       id: "route-centro",
@@ -918,6 +922,7 @@ export const seedState: AppState = {
       validityEnd: "",
       permanent: true,
       notes: "Revisar sequência antes da publicação.",
+      color: "#7c3aed",
     },
     {
       id: "route-feriado",
@@ -937,6 +942,7 @@ export const seedState: AppState = {
       validityEnd: "2026-09-07",
       permanent: false,
       notes: "Cópia independente baseada no domingo.",
+      color: "#0284c7",
     },
   ],
   routeDrivers: [
@@ -1114,7 +1120,7 @@ export const seedState: AppState = {
         address:
           "Avenida Dois, 181, Eldorado, São José dos Campos - SP, 12238-580",
         primary: "#c96520",
-        logo: "/brand/nova-esperanca.jpg",
+        logo: "/brand/nova-esperanca-principal.png",
         signature: "/brand/assinatura-yerardo.png",
         stamp: "/brand/carimbo-nova-esperanca.png",
         bankName: "Banco Bradesco",
@@ -1130,7 +1136,7 @@ export const seedState: AppState = {
         address:
           "Avenida Leonor de Almeida Ribeiro Souto, 227, Residencial União, São José dos Campos - SP",
         primary: "#b6862e",
-        logo: "/brand/excelencia-do-pao.png",
+        logo: "/brand/excelencia-do-pao-nova.png",
         signature: "/brand/assinatura-excelencia.png",
         stamp: "",
         bankName: "Banco Bradesco",
@@ -1496,15 +1502,15 @@ export const seedState: AppState = {
       text: "#1d2835",
       radius: 14,
       density: "Confortável",
-      logo: "/brand/nova-esperanca.jpg",
+      logo: "/brand/nova-esperanca-principal.png",
       loginBackground: "",
-      thumbnail: "/brand/nova-esperanca.jpg",
-      favicon: "/brand/nova-esperanca.jpg",
-      darkPrimary: "#e98942",
-      darkSecondary: "#8fb8da",
-      darkBackground: "#0f1720",
-      darkSurface: "#18232e",
-      darkText: "#edf3f7",
+      thumbnail: "/brand/nova-esperanca-vertical.png",
+      favicon: "/brand/nova-esperanca-vertical.png",
+      darkPrimary: "#a78bfa",
+      darkSecondary: "#7c3aed",
+      darkBackground: "#120d24",
+      darkSurface: "#1f1738",
+      darkText: "#f5f1ff",
     },
     documentTemplates: [
       {

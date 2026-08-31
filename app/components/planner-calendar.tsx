@@ -34,6 +34,7 @@ type PlannerProps = {
   events: PlannerEvent[];
   onCreate?: () => void;
   onSelect?: (event: PlannerEvent) => void;
+  compact?: boolean;
 };
 
 const hours = Array.from({ length: 14 }, (_, index) => index + 7);
@@ -70,6 +71,7 @@ export function PlannerCalendar({
   events,
   onCreate,
   onSelect,
+  compact = false,
 }: PlannerProps) {
   const [cursor, setCursor] = useState(() => new Date());
   const [mode, setMode] = useState<"1 dia" | "3 dias" | "Semana">("Semana");
@@ -246,11 +248,12 @@ export function PlannerCalendar({
               ))}
               {visibleEvents
                 .filter((event) => event.date === iso(day))
-                .map((event) => {
-                  const top =
-                    (Math.max(0, minutes(event.start) - 7 * 60) / 60) * 64;
+                .map((event, eventIndex) => {
+                  const top = compact
+                    ? 10 + eventIndex * 38
+                    : (Math.max(0, minutes(event.start) - 7 * 60) / 60) * 64;
                   const height = Math.max(
-                    34,
+                    compact ? 30 : 34,
                     ((minutes(event.end || event.start) -
                       minutes(event.start)) /
                       60) *
@@ -264,10 +267,12 @@ export function PlannerCalendar({
                   const slot = sameStart.findIndex(
                     (item) => item.id === event.id,
                   );
-                  const columns = Math.min(3, Math.max(1, sameStart.length));
+                  const columns = compact
+                    ? 1
+                    : Math.min(3, Math.max(1, sameStart.length));
                   return (
                     <button
-                      className="planner-event"
+                      className={`planner-event ${compact ? "planner-event-compact" : ""}`}
                       key={event.id}
                       style={{
                         top,
@@ -275,17 +280,23 @@ export function PlannerCalendar({
                         borderColor: event.color,
                         background: `${event.color}18`,
                         color: event.color,
-                        left: `calc(${(slot % columns) * (100 / columns)}% + 3px)`,
-                        width: `calc(${100 / columns}% - 6px)`,
+                        left: compact
+                          ? "4px"
+                          : `calc(${(slot % columns) * (100 / columns)}% + 3px)`,
+                        width: compact
+                          ? "calc(100% - 8px)"
+                          : `calc(${100 / columns}% - 6px)`,
                       }}
                       onClick={() => onSelect?.(event)}
                     >
                       <strong>{event.title}</strong>
-                      <span>
-                        {event.start || "Dia todo"}
-                        {event.end ? ` – ${event.end}` : ""}
-                      </span>
-                      {event.meta && <small>{event.meta}</small>}
+                      {!compact && (
+                        <span>
+                          {event.start || "Dia todo"}
+                          {event.end ? ` – ${event.end}` : ""}
+                        </span>
+                      )}
+                      {!compact && event.meta && <small>{event.meta}</small>}
                     </button>
                   );
                 })}

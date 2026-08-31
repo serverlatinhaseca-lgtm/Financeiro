@@ -35,6 +35,7 @@ import {
   RefreshCw,
   RotateCcw,
   Route,
+  Save,
   Search,
   Settings,
   ShieldCheck,
@@ -67,6 +68,7 @@ import {
   AppState,
   Client,
   Collection,
+  CustomerGroup,
   Emission,
   ModuleId,
   RouteRecord,
@@ -361,7 +363,7 @@ function Login({
         <div className="login-logo">
           <img src={appearance.logo} alt={appearance.appName} />
         </div>
-        <p>{appearance.appName}</p>
+        <p>PLATAFORMA INTERNA · NOVA ESPERANÇA</p>
         <h1>{appearance.tagline}</h1>
         <div className="login-list">
           <span>
@@ -373,6 +375,13 @@ function Login({
           <span>
             <CheckCircle2 /> Identidade, regras e campos editáveis
           </span>
+        </div>
+        <div className="login-partners">
+          <span>Operação integrada com</span>
+          <img
+            src="/brand/excelencia-do-pao-nova.png"
+            alt="Excelência do Pão"
+          />
         </div>
       </section>
       <section className="login-panel">
@@ -535,7 +544,15 @@ export default function Home() {
     ? view
     : allowedNav[0]?.id || "dashboard";
   const page = {
-    dashboard: <Dashboard state={state} onNavigate={setView} commit={commit} />,
+    dashboard: (
+      <Dashboard
+        state={state}
+        onNavigate={setView}
+        commit={commit}
+        userName={session.name}
+        profileName={profile?.name || session.role}
+      />
+    ),
     clientes: <Clients state={state} commit={commit} token={token} />,
     financeiro: <Finance state={state} commit={commit} />,
     cobrancas: (
@@ -772,10 +789,14 @@ function Dashboard({
   state,
   onNavigate,
   commit,
+  userName,
+  profileName,
 }: {
   state: AppState;
   onNavigate: (view: View) => void;
   commit: Commit;
+  userName: string;
+  profileName: string;
 }) {
   const pending = state.emissions.filter((e) => e.status === "Pendente"),
     urgent = state.collections.filter(
@@ -787,46 +808,185 @@ function Dashboard({
       .filter((t) => t.days.includes("Quarta") || t.days.includes("Quinta"))
       .slice(0, 5),
     routeDone = state.routes.filter((r) => r.registered && r.checked).length;
+  const role = profileName.toLowerCase();
+  const isFinance = role.includes("financeiro");
+  const isCollections = role.includes("cobran");
+  const isOperations = role.includes("opera");
+  const isExecutive =
+    role.includes("diretor") || role.includes("administrador");
+  const profileTasks = state.tasks.filter(
+    (task) =>
+      task.responsible.toLowerCase() === userName.toLowerCase() ||
+      task.responsible.toLowerCase().includes(profileName.toLowerCase()),
+  );
+  const dashboardMetrics = isFinance
+    ? [
+        {
+          label: "Emitir hoje",
+          value: pending.filter((item) => item.scheduledDate === today).length,
+          detail: "fechamentos programados",
+          icon: ReceiptText,
+          tone: "copper",
+        },
+        {
+          label: "Emissões atrasadas",
+          value: pending.filter((item) => item.scheduledDate < today).length,
+          detail: "exigem ação imediata",
+          icon: TriangleAlert,
+          tone: "red",
+        },
+        {
+          label: "Emitidas no período",
+          value: state.emissions.filter((item) => item.status === "Emitida")
+            .length,
+          detail: "notas concluídas",
+          icon: CheckCircle2,
+          tone: "green",
+        },
+        {
+          label: "Total em acompanhamento",
+          value: money.format(
+            state.emissions.reduce((sum, item) => sum + item.amount, 0),
+          ),
+          detail: "agenda financeira",
+          icon: CircleDollarSign,
+          tone: "blue",
+        },
+      ]
+    : isCollections
+      ? [
+          {
+            label: "Fila de cobrança",
+            value: state.collections.filter(
+              (item) => !["Paga", "Baixada", "Arquivada"].includes(item.status),
+            ).length,
+            detail: "clientes para acompanhar",
+            icon: WalletCards,
+            tone: "copper",
+          },
+          {
+            label: "Casos críticos",
+            value: urgent.length,
+            detail: "prioridade vermelha",
+            icon: TriangleAlert,
+            tone: "red",
+          },
+          {
+            label: "Recebidas",
+            value: state.collections.filter((item) =>
+              ["Paga", "Baixada"].includes(item.status),
+            ).length,
+            detail: "baixas registradas",
+            icon: CheckCircle2,
+            tone: "green",
+          },
+          {
+            label: "Contatos realizados",
+            value: state.collections.reduce(
+              (sum, item) => sum + item.attempts,
+              0,
+            ),
+            detail: "histórico de tentativas",
+            icon: MessageSquareText,
+            tone: "blue",
+          },
+        ]
+      : isOperations
+        ? [
+            {
+              label: "Minhas tarefas",
+              value: profileTasks.length || tasks.length,
+              detail: "checklist do perfil",
+              icon: ClipboardCheck,
+              tone: "copper",
+            },
+            {
+              label: "A cadastrar",
+              value: state.routes.filter((item) => !item.registered).length,
+              detail: "entregas pendentes",
+              icon: Route,
+              tone: "red",
+            },
+            {
+              label: "Rotas conferidas",
+              value: `${Math.round((routeDone / Math.max(1, state.routes.length)) * 100)}%`,
+              detail: `${routeDone} de ${state.routes.length}`,
+              icon: CheckCircle2,
+              tone: "green",
+            },
+            {
+              label: "Divergências",
+              value: state.routeDivergences.filter(
+                (item) => item.status !== "Fechada",
+              ).length,
+              detail: "itens em tratamento",
+              icon: TriangleAlert,
+              tone: "blue",
+            },
+          ]
+        : [
+            {
+              label: "Emissões pendentes",
+              value: pending.length,
+              detail: "visão financeira consolidada",
+              icon: ReceiptText,
+              tone: "copper",
+            },
+            {
+              label: "Cobranças críticas",
+              value: urgent.length,
+              detail: "ação necessária",
+              icon: TriangleAlert,
+              tone: "red",
+            },
+            {
+              label: "Tarefas concluídas",
+              value: `${Math.round((state.tasks.filter((item) => item.completed).length / Math.max(1, state.tasks.length)) * 100)}%`,
+              detail: "desempenho da equipe",
+              icon: ClipboardCheck,
+              tone: "blue",
+            },
+            {
+              label: "Rotas conferidas",
+              value: `${Math.round((routeDone / Math.max(1, state.routes.length)) * 100)}%`,
+              detail: "qualidade operacional",
+              icon: Route,
+              tone: "green",
+            },
+          ];
+  const focusView: View = isFinance
+    ? "financeiro"
+    : isCollections
+      ? "cobrancas"
+      : isOperations
+        ? "rotas"
+        : "relatorios";
   return (
     <>
-      <PageTitle
-        eyebrow="Quarta-feira, 26 de agosto"
-        title="Bom dia, Administrador."
-        description="Acompanhe prioridades e resolva pendências sem alternar entre planilhas."
-        actions={
-          <Button onClick={() => onNavigate("tarefas")}>
-            <Plus /> Nova tarefa
-          </Button>
-        }
-      />
-      <div className="metrics-grid">
-        <Metric
-          label="Emissões pendentes"
-          value={pending.length}
-          detail="2 com prioridade alta"
-          icon={ReceiptText}
-        />
-        <Metric
-          label="Cobranças críticas"
-          value={urgent.length}
-          detail="ação necessária hoje"
-          icon={TriangleAlert}
-          tone="red"
-        />
-        <Metric
-          label="Tarefas do dia"
-          value={tasks.length}
-          detail={`${tasks.filter((t) => t.completed).length} concluídas`}
-          icon={ClipboardCheck}
-          tone="blue"
-        />
-        <Metric
-          label="Rotas conferidas"
-          value={`${Math.round((routeDone / state.routes.length) * 100)}%`}
-          detail={`${routeDone} de ${state.routes.length}`}
-          icon={Route}
-          tone="green"
-        />
+      <section className="dashboard-welcome">
+        <div>
+          <span>
+            {isExecutive ? "Visão executiva" : `Painel ${profileName}`}
+          </span>
+          <h1>Olá, {userName}.</h1>
+          <p>
+            {isFinance
+              ? "Sua agenda prioriza emissões, fechamentos e vencimentos."
+              : isCollections
+                ? "Sua visão mostra cobranças, contatos e casos críticos."
+                : isOperations
+                  ? "Sua operação reúne tarefas, cadastros, rotas e conferências."
+                  : "Acompanhe resultados, riscos e prioridades de todas as áreas."}
+          </p>
+        </div>
+        <Button onClick={() => onNavigate(focusView)}>
+          Abrir área principal <ChevronRight />
+        </Button>
+      </section>
+      <div className="metrics-grid dashboard-metrics">
+        {dashboardMetrics.map((metric) => (
+          <Metric key={metric.label} {...metric} />
+        ))}
       </div>
       <div className="dashboard-grid">
         <Card className="span-2">
@@ -1141,14 +1301,17 @@ function ClientDirectory({
   }
   async function lookupCep() {
     if (!editing?.cep) return toast.error("Informe o CEP");
+    const cep = editing.cep.replace(/\D/g, "");
+    if (cep.length !== 8) return toast.error("O CEP deve ter 8 números");
     try {
-      const response = await fetch(
-        `https://viacep.com.br/ws/${editing.cep.replace(/\D/g, "")}/json/`,
-      );
+      let response = await fetch(`/api/lookup/cep/${cep}`);
+      if (!response.ok)
+        response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
       const data = await response.json();
-      if (data.erro) throw new Error();
+      if (!response.ok || data.erro) throw new Error();
       setEditing({
         ...editing,
+        cep: data.cep || editing.cep,
         address: [data.logradouro, data.bairro, data.localidade, data.uf]
           .filter(Boolean)
           .join(", "),
@@ -1156,6 +1319,53 @@ function ClientDirectory({
       toast.success("Endereço localizado");
     } catch {
       toast.error("CEP não encontrado");
+    }
+  }
+  async function lookupCnpj() {
+    if (!editing?.document) return toast.error("Informe o CNPJ");
+    const cnpj = editing.document.replace(/\D/g, "");
+    if (cnpj.length !== 14)
+      return toast.error("A consulta automática exige um CNPJ com 14 números");
+    const loading = toast.loading("Consultando Receita Federal...");
+    try {
+      let response = await fetch(`/api/lookup/cnpj/${cnpj}`);
+      if (!response.ok)
+        response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
+      const data = await response.json();
+      if (!response.ok || data.message) throw new Error(data.message);
+      const ie = Array.isArray(data.inscricoes_estaduais)
+        ? data.inscricoes_estaduais.find(
+            (item: { ativo?: boolean }) => item.ativo !== false,
+          )?.inscricao_estadual
+        : "";
+      setEditing({
+        ...editing,
+        document: data.cnpj || editing.document,
+        legalName: data.razao_social || editing.legalName,
+        name: data.nome_fantasia || data.razao_social || editing.name,
+        email: data.email || editing.email,
+        whatsapp: data.ddd_telefone_1 || editing.whatsapp,
+        cep: data.cep || editing.cep,
+        stateRegistration: ie || editing.stateRegistration,
+        address: [
+          data.descricao_tipo_de_logradouro,
+          data.logradouro,
+          data.numero,
+          data.complemento,
+          data.bairro,
+          data.municipio,
+          data.uf,
+        ]
+          .filter(Boolean)
+          .join(", "),
+      });
+      toast.success("Dados cadastrais preenchidos automaticamente", {
+        id: loading,
+      });
+    } catch {
+      toast.error("Não foi possível consultar o CNPJ. Tente novamente.", {
+        id: loading,
+      });
     }
   }
   async function importClients(file?: File) {
@@ -1449,17 +1659,7 @@ function ClientDirectory({
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => {
-                        if (!editing.document)
-                          return toast.error("Informe o CNPJ ou CPF");
-                        setEditing({
-                          ...editing,
-                          legalName: editing.legalName || editing.name,
-                        });
-                        toast.success(
-                          "Documento validado; confirme os dados cadastrais",
-                        );
-                      }}
+                      onClick={lookupCnpj}
                     >
                       Consultar
                     </Button>
@@ -1856,10 +2056,47 @@ function Clients({
 }) {
   const [tab, setTab] = useState("lista");
   const [selectedTag, setSelectedTag] = useState("Todas");
+  const [editingGroup, setEditingGroup] = useState<CustomerGroup | null>(null);
+  const [removingGroup, setRemovingGroup] = useState<CustomerGroup | null>(
+    null,
+  );
   const tags = [...new Set(state.clients.flatMap((client) => client.tags))];
   const targetClients = state.clients.filter(
     (client) => selectedTag === "Todas" || client.tags.includes(selectedTag),
   );
+  const blankGroup: CustomerGroup = {
+    id: "",
+    name: "",
+    payerName: "",
+    payerClientId: "",
+    units: [],
+    inheritRules: true,
+  };
+  function saveGroup(event: FormEvent) {
+    event.preventDefault();
+    if (!editingGroup?.name.trim())
+      return toast.error("Informe o nome do grupo");
+    const payer = state.clients.find(
+      (item) => item.id === editingGroup.payerClientId,
+    );
+    const item = {
+      ...editingGroup,
+      id: editingGroup.id || uid("grupo"),
+      payerName: payer?.name || editingGroup.payerName || "Não definido",
+    };
+    commit(
+      `${editingGroup.id ? "Editou" : "Criou"} grupo ${item.name}`,
+      (draft) => {
+        const index = draft.settings.customerGroups.findIndex(
+          (group) => group.id === item.id,
+        );
+        if (index >= 0) draft.settings.customerGroups[index] = item;
+        else draft.settings.customerGroups.unshift(item);
+      },
+    );
+    setEditingGroup(null);
+    toast.success("Grupo e unidades salvos");
+  }
   return (
     <>
       <PageTitle
@@ -1871,13 +2108,23 @@ function Clients({
         <TabsList className="module-tabs-list">
           <TabsTrigger value="lista">Lista e cadastro</TabsTrigger>
           <TabsTrigger value="grupos">Grupos e unidades</TabsTrigger>
-          <TabsTrigger value="lembretes">Lembretes em massa</TabsTrigger>
-          <TabsTrigger value="importacao">Importação</TabsTrigger>
+          <TabsTrigger value="lembretes">Alertas de cobrança</TabsTrigger>
         </TabsList>
         <TabsContent value="lista">
           <ClientDirectory state={state} commit={commit} token={token} />
         </TabsContent>
         <TabsContent value="grupos">
+          <div className="section-actionbar">
+            <div>
+              <strong>Grupos e unidades</strong>
+              <small>
+                Defina o pagador central, unidades e herança de regras.
+              </small>
+            </div>
+            <Button onClick={() => setEditingGroup({ ...blankGroup })}>
+              <Plus /> Novo grupo
+            </Button>
+          </div>
           <div className="settings-cards">
             {state.settings.customerGroups.map((group) => (
               <Card key={group.id}>
@@ -1901,6 +2148,22 @@ function Clients({
                       ? "As unidades herdam fechamento, vencimento e cobrança do grupo."
                       : "Cada unidade mantém regras próprias."}
                   </small>
+                  <div className="card-actions">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingGroup(structuredClone(group))}
+                    >
+                      <Pencil /> Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRemovingGroup(group)}
+                    >
+                      <Trash2 /> Apagar
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -1909,10 +2172,10 @@ function Clients({
         <TabsContent value="lembretes">
           <Card>
             <CardHeader>
-              <CardTitle>Ativar ou retirar lembretes por seleção</CardTitle>
+              <CardTitle>Alertas automáticos de cobrança</CardTitle>
               <CardDescription>
-                A cobrança automática continua sendo gerada; somente o lembrete
-                do dia do vencimento é retirado.
+                Escolha quem recebe aviso no vencimento. Desativar o alerta não
+                apaga nem impede a geração da cobrança.
               </CardDescription>
             </CardHeader>
             <CardContent className="bulk-reminder">
@@ -1984,29 +2247,214 @@ function Clients({
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="importacao">
-          <Card>
-            <CardHeader>
-              <CardTitle>Migração da planilha Contas a Emitir</CardTitle>
-              <CardDescription>
-                Importa XLSX ou CSV, interpreta clientes, fechamentos,
-                vencimentos e observações e permite revisão.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="stack">
-              <p>
-                Abra “Lista e cadastro” e use <strong>Importar planilha</strong>
-                . No servidor, XLSX e CSV são aceitos. Os registros são
-                mostrados antes de serem incorporados à base.
-              </p>
-              <Button onClick={() => setTab("lista")}>
-                <Upload /> Abrir importação
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
+      <Dialog
+        open={Boolean(editingGroup)}
+        onOpenChange={(open) => !open && setEditingGroup(null)}
+      >
+        <DialogContent>
+          {editingGroup && (
+            <form onSubmit={saveGroup}>
+              <DialogHeader>
+                <DialogTitle>
+                  {editingGroup.id ? "Editar grupo" : "Novo grupo"}
+                </DialogTitle>
+                <DialogDescription>
+                  Cadastre o pagador e todas as unidades relacionadas.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="form-grid">
+                <Field label="Nome do grupo" full>
+                  <Input
+                    value={editingGroup.name}
+                    onChange={(event) =>
+                      setEditingGroup({
+                        ...editingGroup,
+                        name: event.target.value,
+                      })
+                    }
+                    required
+                  />
+                </Field>
+                <Field label="Cliente pagador" full>
+                  <NativeSelect
+                    value={editingGroup.payerClientId || ""}
+                    onChange={(event) =>
+                      setEditingGroup({
+                        ...editingGroup,
+                        payerClientId: event.target.value,
+                      })
+                    }
+                  >
+                    <NativeSelectOption value="">
+                      Selecione na base de clientes
+                    </NativeSelectOption>
+                    {state.clients.map((client) => (
+                      <NativeSelectOption key={client.id} value={client.id}>
+                        {client.name}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </Field>
+                <Field label="Unidades (uma por linha)" full>
+                  <Textarea
+                    rows={7}
+                    value={editingGroup.units.join("\n")}
+                    onChange={(event) =>
+                      setEditingGroup({
+                        ...editingGroup,
+                        units: event.target.value
+                          .split("\n")
+                          .map((value) => value.trim())
+                          .filter(Boolean),
+                      })
+                    }
+                  />
+                </Field>
+                <div className="switch-row full">
+                  <Switch
+                    checked={editingGroup.inheritRules}
+                    onCheckedChange={(checked) =>
+                      setEditingGroup({
+                        ...editingGroup,
+                        inheritRules: checked,
+                      })
+                    }
+                  />
+                  <span>
+                    <strong>Herdar regras do pagador</strong>
+                    <small>
+                      Fechamento, vencimento e cobrança serão aplicados às
+                      unidades.
+                    </small>
+                  </span>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingGroup(null)}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit">
+                  <Save /> Salvar grupo
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+      <AlertDialog
+        open={Boolean(removingGroup)}
+        onOpenChange={(open) => !open && setRemovingGroup(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apagar grupo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              As unidades deixarão de herdar as regras de “{removingGroup?.name}
+              ”. Os clientes não serão apagados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!removingGroup) return;
+                commit(`Apagou grupo ${removingGroup.name}`, (draft) => {
+                  draft.settings.customerGroups =
+                    draft.settings.customerGroups.filter(
+                      (group) => group.id !== removingGroup.id,
+                    );
+                  draft.clients
+                    .filter((client) => client.groupId === removingGroup.id)
+                    .forEach((client) => {
+                      client.groupId = "";
+                    });
+                });
+                setRemovingGroup(null);
+                toast.success("Grupo apagado");
+              }}
+            >
+              Apagar grupo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
+  );
+}
+
+function ScoreMeter({ score }: { score: number }) {
+  const normalized = Math.max(0, Math.min(1000, score));
+  const label =
+    normalized >= 850
+      ? "Excelente"
+      : normalized >= 700
+        ? "Muito bom"
+        : normalized >= 500
+          ? "Regular"
+          : normalized >= 300
+            ? "Baixo"
+            : "Muito baixo";
+  const color =
+    normalized >= 850
+      ? "#16a34a"
+      : normalized >= 700
+        ? "#65a30d"
+        : normalized >= 500
+          ? "#eab308"
+          : normalized >= 300
+            ? "#f97316"
+            : "#ef4444";
+  return (
+    <div className="serasa-score">
+      <div className="score-arc">
+        <svg viewBox="0 0 240 142" aria-label={`Score ${normalized} de 1000`}>
+          <defs>
+            <linearGradient id="score-spectrum" x1="0" x2="1">
+              <stop offset="0" stopColor="#ef4444" />
+              <stop offset=".35" stopColor="#f97316" />
+              <stop offset=".58" stopColor="#eab308" />
+              <stop offset=".78" stopColor="#84cc16" />
+              <stop offset="1" stopColor="#16a34a" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M 22 122 A 98 98 0 0 1 218 122"
+            pathLength="100"
+            className="score-track"
+          />
+          <path
+            d="M 22 122 A 98 98 0 0 1 218 122"
+            pathLength="100"
+            className="score-value"
+            strokeDasharray={`${normalized / 10} 100`}
+          />
+        </svg>
+        <div>
+          <strong>{normalized}</strong>
+          <span>de 1000</span>
+        </div>
+      </div>
+      <div className="score-copy">
+        <span style={{ color }}>SCORE DO CLIENTE</span>
+        <h3>O score está {label.toLowerCase()}</h3>
+        <p>
+          Indicador calculado pelo histórico de pagamentos, atrasos,
+          reagendamentos e pendências.
+        </p>
+      </div>
+      <div className="score-scale">
+        <i />
+        <i />
+        <i />
+        <i />
+        <i />
+      </div>
+    </div>
   );
 }
 
@@ -2043,14 +2491,6 @@ function ClientProfile({
         cols.filter((item) => item.status === "Reagendada").length * 25,
     ),
   );
-  const scoreLabel =
-    calculatedScore >= 850
-      ? "Excelente relacionamento"
-      : calculatedScore >= 700
-        ? "Bom pagador"
-        : calculatedScore >= 500
-          ? "Atenção ao histórico"
-          : "Risco elevado";
   return (
     <Sheet open onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="profile-sheet">
@@ -2060,22 +2500,7 @@ function ClientProfile({
             {client.company} · {client.document}
           </SheetDescription>
         </SheetHeader>
-        <div className="profile-score">
-          <div
-            className="score-gauge"
-            style={{
-              background: `conic-gradient(${calculatedScore >= 700 ? "#198754" : calculatedScore >= 500 ? "#d18a35" : "#b84036"} ${calculatedScore / 10}%, #e6e8eb 0)`,
-            }}
-          >
-            <span>{calculatedScore}</span>
-          </div>
-          <div>
-            <small>Score financeiro · 0 a 1000</small>
-            <strong>{scoreLabel}</strong>
-            <em>Reduz automaticamente com atrasos e reagendamentos.</em>
-          </div>
-          <Status>{guidance.open} vencida(s)</Status>
-        </div>
+        <ScoreMeter score={calculatedScore} />
         <div className={`policy-guidance tone-${guidance.tone}`}>
           <TriangleAlert />
           <span>
@@ -4692,6 +5117,7 @@ function Finance({ state, commit }: { state: AppState; commit: Commit }) {
           <PlannerCalendar
             title="Planner financeiro"
             events={financeEvents}
+            compact
             onCreate={() => setTab("emissoes")}
             onSelect={setSelectedEvent}
           />

@@ -218,10 +218,28 @@ export function normalizeFinancialState(
     customerGroups: source.settings?.customerGroups?.length
       ? source.settings.customerGroups
       : structuredClone(seedState.settings.customerGroups),
-    appearance: {
-      ...structuredClone(seedState.settings.appearance),
-      ...(source.settings?.appearance || {}),
-    },
+    appearance: (() => {
+      const appearance = {
+        ...structuredClone(seedState.settings.appearance),
+        ...(source.settings?.appearance || {}),
+      };
+      if (
+        appearance.darkBackground === "#0f1720" &&
+        appearance.darkSurface === "#18232e"
+      ) {
+        appearance.darkPrimary = "#a78bfa";
+        appearance.darkSecondary = "#7c3aed";
+        appearance.darkBackground = "#120d24";
+        appearance.darkSurface = "#1f1738";
+        appearance.darkText = "#f5f1ff";
+      }
+      if (appearance.logo === "/brand/nova-esperanca.jpg") {
+        appearance.logo = "/brand/nova-esperanca-principal.png";
+        appearance.thumbnail = "/brand/nova-esperanca-vertical.png";
+        appearance.favicon = "/brand/nova-esperanca-vertical.png";
+      }
+      return appearance;
+    })(),
     documentTemplates: source.settings?.documentTemplates?.length
       ? source.settings.documentTemplates
       : structuredClone(seedState.settings.documentTemplates),

@@ -40,6 +40,7 @@ import {
   PlannerCalendar,
   PlannerEvent,
 } from "@/app/components/planner-calendar";
+import { RouteMap } from "@/app/components/route-map";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -152,6 +153,7 @@ const blankPlan: RoutePlan = {
   validityEnd: "",
   permanent: true,
   notes: "",
+  color: "#f97316",
 };
 
 const blankHoliday: OperationalHoliday = {
@@ -201,6 +203,8 @@ export function RouteOperationsCenter({
   const [statusFilter, setStatusFilter] = useState("Todos");
   const [selected, setSelected] = useState<string[]>([]);
   const [moveTarget, setMoveTarget] = useState("");
+  const [registerRouteFilter, setRegisterRouteFilter] = useState("Todas");
+  const [registerOnlyPending, setRegisterOnlyPending] = useState(true);
   const [editingDriver, setEditingDriver] = useState<RouteDriver | null>(null);
   const [editingPlan, setEditingPlan] = useState<RoutePlan | null>(null);
   const [editingHoliday, setEditingHoliday] =
@@ -232,6 +236,27 @@ export function RouteOperationsCenter({
         .includes(search.toLowerCase())
     );
   });
+  const registrationRows = useMemo(
+    () =>
+      state.routes.filter((row, index) => {
+        const name = routeName(row, index);
+        return (
+          (!registerOnlyPending || !row.registered) &&
+          (registerRouteFilter === "Todas" || name === registerRouteFilter) &&
+          [row.client, row.driver, row.notes, row.time, name]
+            .join(" ")
+            .toLowerCase()
+            .includes(search.toLowerCase())
+        );
+      }),
+    [
+      registerOnlyPending,
+      registerRouteFilter,
+      search,
+      state.routes,
+      state.routePlans,
+    ],
+  );
   const plannerEvents: PlannerEvent[] = [
     ...state.routeHolidays.map((holiday) => ({
       id: holiday.id,
@@ -878,13 +903,15 @@ export function RouteOperationsCenter({
               <div>
                 <CardTitle>O que preciso cadastrar?</CardTitle>
                 <CardDescription>
-                  Consulta limpa para usar ao lado do sistema externo de
-                  pedidos.
+                  Fila operacional limpa, agrupada e pronta para usar ao lado do
+                  sistema externo de pedidos.
                 </CardDescription>
               </div>
               <Button
                 onClick={() => {
-                  const ids = pending.slice(0, 25).map((item) => item.id);
+                  const ids = registrationRows
+                    .slice(0, 25)
+                    .map((item) => item.id);
                   commit("Marcou lote como cadastrado", (draft) =>
                     draft.routes
                       .filter((item) => ids.includes(item.id))
@@ -893,35 +920,138 @@ export function RouteOperationsCenter({
                   toast.success("Lote marcado como cadastrado");
                 }}
               >
-                Cadastrar lote visível
+                <CheckCircle2 /> Marcar lote visível
               </Button>
             </CardHeader>
-            <CardContent className="register-cards">
-              {pending.slice(0, 25).map((row, index) => (
-                <article key={row.id}>
-                  <b>{row.order || index + 1}</b>
+            <CardContent>
+              <div className="registration-summary">
+                <div>
+                  <ClipboardCheck />
                   <span>
+                    <small>Pendentes</small>
                     <strong>
-                      {row.time} · {row.client}
+                      {state.routes.filter((item) => !item.registered).length}
                     </strong>
-                    <small>
-                      {routeName(row, index)} · {row.driver} · {row.batch}
-                    </small>
-                    <em>{row.notes || "Sem observação importante"}</em>
                   </span>
-                  <Status>
-                    {row.rule === "sob-demanda"
-                      ? "Aguardando confirmação"
-                      : "Não cadastrado"}
-                  </Status>
-                  <Button
-                    size="sm"
-                    onClick={() => editRouteField(row.id, "registered", true)}
+                </div>
+                <div>
+                  <CheckCircle2 />
+                  <span>
+                    <small>Cadastradas</small>
+                    <strong>{registered}</strong>
+                  </span>
+                </div>
+                <div>
+                  <AlertTriangle />
+                  <span>
+                    <small>Sob demanda</small>
+                    <strong>
+                      {
+                        state.routes.filter(
+                          (item) =>
+                            item.rule === "sob-demanda" && !item.registered,
+                        ).length
+                      }
+                    </strong>
+                  </span>
+                </div>
+              </div>
+              <div className="registration-toolbar">
+                <div>
+                  <Search />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Buscar cliente, rota, motorista ou observação"
+                  />
+                </div>
+                <NativeSelect
+                  value={registerRouteFilter}
+                  onChange={(event) =>
+                    setRegisterRouteFilter(event.target.value)
+                  }
+                >
+                  <NativeSelectOption>Todas</NativeSelectOption>
+                  {state.routePlans.map((plan) => (
+                    <NativeSelectOption key={plan.id}>
+                      {plan.name}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+                <label>
+                  <Switch
+                    checked={registerOnlyPending}
+                    onCheckedChange={setRegisterOnlyPending}
+                  />
+                  <span>Somente pendentes</span>
+                </label>
+                <strong>{registrationRows.length} resultados</strong>
+              </div>
+              <div className="registration-board">
+                {registrationRows.slice(0, 60).map((row, index) => (
+                  <article
+                    key={row.id}
+                    className={row.rule === "sob-demanda" ? "is-demand" : ""}
                   >
-                    Cadastrado
-                  </Button>
-                </article>
-              ))}
+                    <div className="registration-order">
+                      <b>{row.order || index + 1}</b>
+                      <small>{row.time}</small>
+                    </div>
+                    <div className="registration-main">
+                      <span>
+                        <strong>{row.client}</strong>
+                        <Status>
+                          {row.rule === "sob-demanda"
+                            ? "Confirmar antes"
+                            : row.registered
+                              ? "Cadastrado"
+                              : "Pendente"}
+                        </Status>
+                      </span>
+                      <p>
+                        {routeName(row, index)} · {row.driver} ·{" "}
+                        {row.trip || row.batch}
+                      </p>
+                      <small>{row.notes || "Sem observação importante"}</small>
+                    </div>
+                    <div className="registration-actions">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          editRouteField(row.id, "checked", !row.checked)
+                        }
+                      >
+                        {row.checked ? "Conferido" : "Conferir"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={row.registered}
+                        onClick={() =>
+                          editRouteField(row.id, "registered", true)
+                        }
+                      >
+                        {row.registered ? (
+                          <>
+                            <CheckCircle2 /> Feito
+                          </>
+                        ) : (
+                          "Marcar cadastrado"
+                        )}
+                      </Button>
+                    </div>
+                  </article>
+                ))}
+                {!registrationRows.length && (
+                  <div className="empty-state">
+                    <CheckCircle2 />
+                    <strong>Nenhuma entrega nesta seleção</strong>
+                    <small>
+                      Altere os filtros ou desative “Somente pendentes”.
+                    </small>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1015,7 +1145,7 @@ export function RouteOperationsCenter({
               {state.routePlans.map((plan) => (
                 <article key={plan.id}>
                   <div>
-                    <Route />
+                    <Route style={{ color: plan.color || "#f97316" }} />
                     <Status>{plan.status}</Status>
                   </div>
                   <h3>{plan.name}</h3>
@@ -1063,42 +1193,7 @@ export function RouteOperationsCenter({
         </TabsContent>
 
         <TabsContent value="map">
-          <Card>
-            <CardHeader>
-              <CardTitle>Mapa operacional de rotas</CardTitle>
-              <CardDescription>
-                Sequência, motorista e posição relativa das paradas. A estrutura
-                aceita latitude/longitude e futura integração cartográfica.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="route-map-board">
-                <div className="map-grid" />
-                {state.routePlans.map((plan, index) => (
-                  <div
-                    className="map-route-line"
-                    key={plan.id}
-                    style={{ top: 55 + index * 115 }}
-                  >
-                    <span>{plan.name}</span>
-                    {state.routes
-                      .slice(index * 5, index * 5 + 5)
-                      .map((row, point) => (
-                        <button
-                          key={row.id}
-                          title={`${row.client} · ${row.driver}`}
-                          style={{ left: `${12 + point * 18}%` }}
-                        >
-                          <MapPinned />
-                          <small>{point + 1}</small>
-                          <em>{row.client.slice(0, 12)}</em>
-                        </button>
-                      ))}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <RouteMap state={state} />
         </TabsContent>
 
         <TabsContent value="stops">
@@ -1938,6 +2033,31 @@ export function RouteOperationsCenter({
                       </NativeSelectOption>
                     ))}
                   </NativeSelect>
+                </div>
+                <div className="field">
+                  <Label>Cor da rota no mapa</Label>
+                  <div className="route-color-field">
+                    <Input
+                      type="color"
+                      value={editingPlan.color || "#f97316"}
+                      onChange={(event) =>
+                        setEditingPlan({
+                          ...editingPlan,
+                          color: event.target.value,
+                        })
+                      }
+                    />
+                    <Input
+                      value={editingPlan.color || "#f97316"}
+                      onChange={(event) =>
+                        setEditingPlan({
+                          ...editingPlan,
+                          color: event.target.value,
+                        })
+                      }
+                      aria-label="Código hexadecimal da cor"
+                    />
+                  </div>
                 </div>
                 <div className="field full">
                   <Label>Viagens (uma por linha)</Label>

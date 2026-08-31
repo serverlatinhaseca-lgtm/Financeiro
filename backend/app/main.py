@@ -6,6 +6,8 @@ import csv
 import io
 import re
 import unicodedata
+import urllib.error
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -224,6 +226,37 @@ def health() -> dict[str, str]:
         cursor.execute("SELECT 1")
         cursor.fetchone()
     return {"status": "ok"}
+
+
+def public_json(url: str) -> dict[str, Any]:
+    request = urllib.request.Request(
+        url,
+        headers={"User-Agent": "GestaoOperacional/2.0 (+consulta-cadastral)"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=12) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise HTTPException(502, "O serviço público de consulta não respondeu") from exc
+
+
+@app.get("/api/lookup/cep/{cep}")
+def lookup_cep(cep: str):
+    digits = re.sub(r"\D", "", cep)
+    if len(digits) != 8:
+        raise HTTPException(422, "CEP inválido")
+    payload = public_json(f"https://viacep.com.br/ws/{digits}/json/")
+    if payload.get("erro"):
+        raise HTTPException(404, "CEP não encontrado")
+    return payload
+
+
+@app.get("/api/lookup/cnpj/{cnpj}")
+def lookup_cnpj(cnpj: str):
+    digits = re.sub(r"\D", "", cnpj)
+    if len(digits) != 14:
+        raise HTTPException(422, "CNPJ inválido")
+    return public_json(f"https://brasilapi.com.br/api/cnpj/v1/{digits}")
 
 
 @app.post("/api/auth/login")
