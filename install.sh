@@ -211,14 +211,32 @@ if [[ "$ready" != true ]]; then
   fail "Os serviços não ficaram prontos dentro do tempo esperado."
 fi
 
-if [[ "$RESET_ADMIN_PASSWORD" == true ]]; then
-  info "Sincronizando acesso do administrador"
-  docker compose exec -T backend python -m app.reset_admin || fail "Não foi possível redefinir o acesso administrativo."
-  ok "Administrador sincronizado com ADMIN_PASSWORD"
-fi
+# O administrador é sempre sincronizado com o .env atual. Isso evita que uma
+# atualização preserve no banco um hash antigo e torne o painel inacessível.
+info "Sincronizando acesso do administrador"
+docker compose exec -T backend python -m app.reset_admin || fail "Não foi possível sincronizar o acesso administrativo."
+ok "Administrador sincronizado com ADMIN_PASSWORD"
 
 if command -v curl >/dev/null 2>&1; then
   curl --fail --silent --show-error http://localhost/api/health >/dev/null || fail "A API iniciou, mas não respondeu pelo Nginx."
+  home_html="$(curl --fail --silent --show-error http://localhost/)" || fail "O frontend não respondeu pelo Nginx."
+  [[ "$home_html" == *"Gestão Operacional"* || "$home_html" == *"Gestao Operacional"* ]] \
+    || fail "O frontend respondeu, mas não entregou a aplicação esperada."
+  ok "Frontend e API respondendo pelo endereço principal"
+
+  admin_user="admin"
+  admin_email="$(sed -n 's/^ADMIN_EMAIL=//p' .env | tail -n 1)"
+  admin_email="${admin_email:-admin@gestao.local}"
+  admin_password="$(sed -n 's/^ADMIN_PASSWORD=//p' .env | tail -n 1)"
+
+  login_payload_user="$(python3 -c 'import json,sys; print(json.dumps({"username":sys.argv[1],"password":sys.argv[2]}))' "$admin_user" "$admin_password")"
+  login_payload_email="$(python3 -c 'import json,sys; print(json.dumps({"username":sys.argv[1],"password":sys.argv[2]}))' "$admin_email" "$admin_password")"
+
+  curl --fail --silent --show-error -H 'Content-Type: application/json' -d "$login_payload_user" http://localhost/api/auth/login >/dev/null \
+    || fail "A aplicação subiu, mas o login por usuário falhou. A instalação foi interrompida para não entregar um site inacessível."
+  curl --fail --silent --show-error -H 'Content-Type: application/json' -d "$login_payload_email" http://localhost/api/auth/login >/dev/null \
+    || fail "A aplicação subiu, mas o login por e-mail falhou. A instalação foi interrompida para não entregar um site inacessível."
+  ok "Login validado por usuário e por e-mail"
 fi
 
 server_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"

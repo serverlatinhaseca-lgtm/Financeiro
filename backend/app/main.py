@@ -127,7 +127,25 @@ def initialize_database() -> None:
             """
         )
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100)")
-        cursor.execute("UPDATE users SET username = split_part(email, '@', 1) WHERE username IS NULL OR username = ''")
+        cursor.execute("UPDATE users SET username = split_part(email, '@', 1) WHERE username IS NULL OR BTRIM(username) = ''")
+        # Bancos de versões antigas podem possuir usuários cujos e-mails têm o
+        # mesmo prefixo (ex.: financeiro@empresaA e financeiro@empresaB). A
+        # migração anterior transformava ambos em "financeiro" e o índice
+        # único derrubava a API no startup. Mantemos o primeiro e tornamos os
+        # demais identificadores únicos, sem apagar ou sobrescrever usuários.
+        cursor.execute(
+            """
+            WITH ranked AS (
+                SELECT id, username,
+                       ROW_NUMBER() OVER (PARTITION BY LOWER(username) ORDER BY id) AS rn
+                  FROM users
+            )
+            UPDATE users AS u
+               SET username = LEFT(u.username, 82) || '-' || u.id::text
+              FROM ranked AS r
+             WHERE u.id = r.id AND r.rn > 1
+            """
+        )
         cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique ON users (LOWER(username))")
         cursor.execute("SELECT id FROM users WHERE email = %s", (ADMIN_EMAIL,))
         if cursor.fetchone() is None:
@@ -286,12 +304,25 @@ def lookup_cnpj(cnpj: str):
 
 @app.post("/api/auth/login")
 def login(body: LoginBody):
+    identifier = body.username.strip().lower()
+    if not identifier or not body.password:
+        raise HTTPException(422, "Informe usuário/e-mail e senha")
     with connection() as conn, conn.cursor() as cursor:
-        cursor.execute("SELECT id, name, email, password_hash, role, active FROM users WHERE LOWER(username) = LOWER(%s)", (body.username.strip(),))
+        cursor.execute(
+            """
+            SELECT id, name, email, password_hash, role, active
+              FROM users
+             WHERE LOWER(COALESCE(username, '')) = %s
+                OR LOWER(email) = %s
+             ORDER BY CASE WHEN LOWER(COALESCE(username, '')) = %s THEN 0 ELSE 1 END
+             LIMIT 1
+            """,
+            (identifier, identifier, identifier),
+        )
         row = cursor.fetchone()
     if not row or not row[5] or not bcrypt.checkpw(body.password.encode(), row[3].encode()):
         raise HTTPException(401, "Credenciais inválidas")
-    audit(row[0], "login")
+    audit(row[0], "login", {"identifier": identifier})
     return {"token": make_token(row[0], row[2], row[4]), "user": {"id": row[0], "name": row[1], "email": row[2], "role": row[4]}}
 
 
