@@ -1,5 +1,38 @@
 # Gestão Operacional
 
+Versão profissional completa para a Indústria de Pães Nova Esperança.
+
+## Instalação no servidor
+
+Depois de enviar todos os arquivos deste pacote ao repositório e executar `git pull`:
+
+```bash
+chmod +x install.sh
+./install.sh
+```
+
+O frontend já está compilado. A instalação não executa `npm ci`, não exige
+Docker Buildx e evita as falhas `invalid tar header` e `invalid checksum` que
+ocorriam ao construir centenas de dependências no servidor.
+
+Também é possível iniciar diretamente:
+
+```bash
+docker compose up -d --build
+```
+
+O `install.sh` é recomendado na primeira instalação porque cria o `.env`,
+sincroniza a senha do PostgreSQL, valida os serviços e mostra o acesso inicial.
+
+## Conteúdo do frontend
+
+- `frontend/dist/`: aplicação de produção completa, usada pelo Docker.
+- `frontend/CODIGO_FONTE_COMPLETO.zip`: todo o código-fonte editável.
+- `frontend/runtime-server.mjs`: servidor leve do frontend.
+
+O pacote externo mantém menos de 100 arquivos para facilitar o envio pelo
+GitHub, sem omitir o frontend ou qualquer módulo do sistema.
+
 Sistema web integrado e personalizável para centralizar clientes, financeiro, cobranças, tarefas, bases de rotas, documentos e gestão de acesso. Os módulos são áreas completas, com painéis, calendários, abas operacionais, histórico, regras e relatórios — não são apenas itens isolados do menu.
 
 ## O que está incluído

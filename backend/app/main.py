@@ -27,10 +27,9 @@ JWT_SECRET = os.getenv("JWT_SECRET", "troque-esta-chave-em-producao")
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@gestao.local").lower()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "Admin@123")
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "/data/uploads"))
-MAX_UPLOAD = 20 * 1024 * 1024
-RELEASE_ID = os.getenv("RELEASE_ID", "2026.08.31-R6-FULLSTACK")
+MAX_UPLOAD = 5 * 1024 * 1024
 
-app = FastAPI(title="Gestão Operacional API", version="2.1.0")
+app = FastAPI(title="Gestão Operacional API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost").split(",")],
@@ -83,6 +82,14 @@ def fetch_json(url: str) -> Any:
         raise HTTPException(502, "Serviço externo de mapas indisponível") from exc
 
 
+def try_fetch_json(url: str) -> Any | None:
+    """Best-effort public lookup used by the geocoder fallback chain."""
+    try:
+        return fetch_json(url)
+    except HTTPException:
+        return None
+
+
 def connection():
     return psycopg.connect(DATABASE_URL, autocommit=True)
 
@@ -128,25 +135,7 @@ def initialize_database() -> None:
             """
         )
         cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(100)")
-        cursor.execute("UPDATE users SET username = split_part(email, '@', 1) WHERE username IS NULL OR BTRIM(username) = ''")
-        # Bancos de versões antigas podem possuir usuários cujos e-mails têm o
-        # mesmo prefixo (ex.: financeiro@empresaA e financeiro@empresaB). A
-        # migração anterior transformava ambos em "financeiro" e o índice
-        # único derrubava a API no startup. Mantemos o primeiro e tornamos os
-        # demais identificadores únicos, sem apagar ou sobrescrever usuários.
-        cursor.execute(
-            """
-            WITH ranked AS (
-                SELECT id, username,
-                       ROW_NUMBER() OVER (PARTITION BY LOWER(username) ORDER BY id) AS rn
-                  FROM users
-            )
-            UPDATE users AS u
-               SET username = LEFT(u.username, 82) || '-' || u.id::text
-              FROM ranked AS r
-             WHERE u.id = r.id AND r.rn > 1
-            """
-        )
+        cursor.execute("UPDATE users SET username = split_part(email, '@', 1) WHERE username IS NULL OR username = ''")
         cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique ON users (LOWER(username))")
         cursor.execute("SELECT id FROM users WHERE email = %s", (ADMIN_EMAIL,))
         if cursor.fetchone() is None:
@@ -269,7 +258,7 @@ def health() -> dict[str, str]:
     with connection() as conn, conn.cursor() as cursor:
         cursor.execute("SELECT 1")
         cursor.fetchone()
-    return {"status": "ok", "release": RELEASE_ID, "api": "2.1.0"}
+    return {"status": "ok"}
 
 
 def public_json(url: str) -> dict[str, Any]:
@@ -280,10 +269,6 @@ def public_json(url: str) -> dict[str, Any]:
     try:
         with urllib.request.urlopen(request, timeout=12) as response:
             return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
-            raise HTTPException(404, "Cadastro não encontrado") from exc
-        raise HTTPException(502, "O serviço público de consulta não respondeu") from exc
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise HTTPException(502, "O serviço público de consulta não respondeu") from exc
 
@@ -309,25 +294,12 @@ def lookup_cnpj(cnpj: str):
 
 @app.post("/api/auth/login")
 def login(body: LoginBody):
-    identifier = body.username.strip().lower()
-    if not identifier or not body.password:
-        raise HTTPException(422, "Informe usuário/e-mail e senha")
     with connection() as conn, conn.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT id, name, email, password_hash, role, active
-              FROM users
-             WHERE LOWER(COALESCE(username, '')) = %s
-                OR LOWER(email) = %s
-             ORDER BY CASE WHEN LOWER(COALESCE(username, '')) = %s THEN 0 ELSE 1 END
-             LIMIT 1
-            """,
-            (identifier, identifier, identifier),
-        )
+        cursor.execute("SELECT id, name, email, password_hash, role, active FROM users WHERE LOWER(username) = LOWER(%s)", (body.username.strip(),))
         row = cursor.fetchone()
     if not row or not row[5] or not bcrypt.checkpw(body.password.encode(), row[3].encode()):
         raise HTTPException(401, "Credenciais inválidas")
-    audit(row[0], "login", {"identifier": identifier})
+    audit(row[0], "login")
     return {"token": make_token(row[0], row[2], row[4]), "user": {"id": row[0], "name": row[1], "email": row[2], "role": row[4]}}
 
 
@@ -416,21 +388,10 @@ def get_state(user: dict[str, Any] = Depends(current_user)):
 @app.put("/api/state")
 def put_state(payload: dict[str, Any], user: dict[str, Any] = Depends(current_user)):
     with connection() as conn, conn.cursor() as cursor:
-        cursor.execute("SELECT payload, version FROM app_state WHERE id = 1 FOR UPDATE")
-        previous_payload, previous_version = cursor.fetchone()
-        previous_payload = previous_payload or {}
-        changed_sections = sorted(
-            key for key in set(previous_payload) | set(payload)
-            if previous_payload.get(key) != payload.get(key)
-        )
         cursor.execute("UPDATE app_state SET payload = %s::jsonb, version = version + 1, updated_by = %s, updated_at = NOW() WHERE id = 1 RETURNING version, updated_at", (json.dumps(payload), user["id"]))
         version, updated_at = cursor.fetchone()
-    audit(user["id"], "state_update", {
-        "previous_version": previous_version,
-        "version": version,
-        "changed_sections": changed_sections,
-    })
-    return {"ok": True, "version": version, "updated_at": updated_at, "changed_sections": changed_sections}
+    audit(user["id"], "state_update", {"version": version})
+    return {"ok": True, "version": version, "updated_at": updated_at}
 
 
 @app.get("/api/backup")
@@ -466,18 +427,47 @@ def geocode_address(q: str):
     if len(query) < 4 or len(query) > 240:
         raise HTTPException(422, "Informe um endereço válido")
 
-    # CEP brasileiro: resolve primeiro pelo ViaCEP e só então geocodifica o endereço completo.
-    # Isso evita depender do Nominatim reconhecer uma sequência de 8 dígitos como CEP.
     digits = re.sub(r"\D", "", query)
-    if len(digits) == 8 and len(re.sub(r"[\d\s.-]", "", query)) == 0:
-        cep_data = public_json(f"https://viacep.com.br/ws/{digits}/json/")
-        if cep_data.get("erro"):
-            raise HTTPException(404, "CEP não encontrado")
-        query = ", ".join(filter(None, [
-            cep_data.get("logradouro"), cep_data.get("bairro"),
-            cep_data.get("localidade"), cep_data.get("uf"), digits, "Brasil"
-        ]))
+    if len(digits) == 8:
+        brasil = try_fetch_json(f"https://brasilapi.com.br/api/cep/v2/{digits}")
+        if isinstance(brasil, dict):
+            location = brasil.get("location") or {}
+            coordinates = location.get("coordinates") or {}
+            try:
+                latitude = float(coordinates.get("latitude"))
+                longitude = float(coordinates.get("longitude"))
+                label = ", ".join(
+                    str(value)
+                    for value in [
+                        brasil.get("street"),
+                        brasil.get("neighborhood"),
+                        brasil.get("city"),
+                        brasil.get("state"),
+                        digits,
+                    ]
+                    if value
+                )
+                return {
+                    "results": [
+                        {"display_name": label, "lat": latitude, "lon": longitude}
+                    ]
+                }
+            except (TypeError, ValueError):
+                pass
 
+        via_cep = try_fetch_json(f"https://viacep.com.br/ws/{digits}/json/")
+        if isinstance(via_cep, dict) and not via_cep.get("erro"):
+            query = ", ".join(
+                str(value)
+                for value in [
+                    via_cep.get("logradouro"),
+                    via_cep.get("bairro"),
+                    via_cep.get("localidade"),
+                    via_cep.get("uf"),
+                    "Brasil",
+                ]
+                if value
+            )
     params = urllib.parse.urlencode(
         {
             "format": "jsonv2",
@@ -556,7 +546,7 @@ async def upload_file(file: UploadFile = File(...), user: dict[str, Any] = Depen
     from uuid import uuid4
     content = await file.read(MAX_UPLOAD + 1)
     if len(content) > MAX_UPLOAD:
-        raise HTTPException(413, "Arquivo maior que 20 MB")
+        raise HTTPException(413, "Arquivo maior que 5 MB")
     file_id = uuid4()
     extension = Path(file.filename or "arquivo").suffix.lower()[:10]
     destination = UPLOAD_DIR / f"{file_id}{extension}"
@@ -571,7 +561,7 @@ async def upload_file(file: UploadFile = File(...), user: dict[str, Any] = Depen
 async def import_clients(file: UploadFile = File(...), user: dict[str, Any] = Depends(current_user)):
     content = await file.read(MAX_UPLOAD + 1)
     if len(content) > MAX_UPLOAD:
-        raise HTTPException(413, "Planilha maior que 20 MB")
+        raise HTTPException(413, "Planilha maior que 5 MB")
     suffix = Path(file.filename or "").suffix.lower()
     raw_rows: list[dict[str, Any]] = []
     if suffix == ".csv":
