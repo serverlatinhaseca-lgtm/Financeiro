@@ -258,7 +258,11 @@ def health() -> dict[str, str]:
     with connection() as conn, conn.cursor() as cursor:
         cursor.execute("SELECT 1")
         cursor.fetchone()
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "release": "2026.09.01-R7-MAP-UX",
+        "api": "2.2.0",
+    }
 
 
 def public_json(url: str) -> dict[str, Any]:
@@ -449,8 +453,14 @@ def geocode_address(q: str):
                 )
                 return {
                     "results": [
-                        {"display_name": label, "lat": latitude, "lon": longitude}
-                    ]
+                        {
+                            "display_name": label,
+                            "lat": latitude,
+                            "lon": longitude,
+                            "provider": "BrasilAPI",
+                        }
+                    ],
+                    "query": query,
                 }
             except (TypeError, ValueError):
                 pass
@@ -477,7 +487,13 @@ def geocode_address(q: str):
             "q": query,
         }
     )
-    payload = fetch_json(f"https://nominatim.openstreetmap.org/search?{params}")
+    payload = try_fetch_json(f"https://nominatim.openstreetmap.org/search?{params}")
+    if not isinstance(payload, list):
+        return {
+            "results": [],
+            "query": query,
+            "message": "Os serviços públicos de localização não responderam.",
+        }
     results = []
     for item in payload[:6]:
         try:
@@ -486,11 +502,12 @@ def geocode_address(q: str):
                     "display_name": str(item["display_name"]),
                     "lat": float(item["lat"]),
                     "lon": float(item["lon"]),
+                    "provider": "OpenStreetMap",
                 }
             )
         except (KeyError, TypeError, ValueError):
             continue
-    return {"results": results}
+    return {"results": results, "query": query}
 
 
 @app.post("/api/map/optimize")

@@ -1,0 +1,25 @@
+PACOTE COMPLETO R7 — MAPA E DESIGN
+
+Esta pasta deve substituir os arquivos antigos do repositório.
+
+ARQUIVOS QUE CONFIRMAM A VERSÃO CORRETA:
+- frontend/Dockerfile: contém apenas COPY dist e CMD node runtime-server.mjs.
+- frontend/dist/server/index.js: frontend completo já compilado.
+- backend/app/main.py: release 2026.09.01-R7-MAP-UX.
+
+NÃO extraia o arquivo:
+frontend/CODIGO_FONTE_EDITAVEL_NAO_EXTRAIR_NO_SERVIDOR.zip
+
+Ele é apenas uma cópia editável do código-fonte e não é usado pelo Docker.
+
+Depois de atualizar o repositório, no servidor execute:
+
+git pull
+docker compose build --no-cache backend frontend
+docker compose up -d --force-recreate backend frontend nginx
+docker compose ps
+curl -s http://localhost/api/health
+
+O health correto contém:
+2026.09.01-R7-MAP-UX
+
